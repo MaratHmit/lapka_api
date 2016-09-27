@@ -22,7 +22,7 @@ class Category extends Base
 
     private function getPathName($item, $items)
     {
-        if (!$item["upid"])
+        if (!$item["idParent"])
             return $item["name"];
 
         $parent = $this->getParentItem($item, $items);
@@ -156,11 +156,11 @@ class Category extends Base
         if (!$id)
             return $result;
 
-        $u = new DB('shop_discounts', 'sd');
+        $u = new DB('shop_discount', 'sd');
         $u->select('sd.*');
-        $u->innerJoin('shop_discount_links sdl', 'sdl.discount_id = sd.id');
+        $u->innerJoin('shop_discount_link sdl', 'sdl.id_discount = sd.id');
         $u->where('sdl.id_group = ?', $id);
-        $u->orderBy('sd.id');
+        $u->orderBy('sdl.sort');
         return $u->getList();
     }
 
@@ -197,21 +197,13 @@ class Category extends Base
         if (!$id)
             return $result;
 
-        $u = new DB('shop_crossgroup', 'scg');
-        $u->select('sg.id, sg.name');
-        $u->innerJoin('shop_group sg', 'scg.group_id = sg.id');
+        $u = new DB('shop_group_link', 'sgl');
+        $u->select('sg.id, tr.name');
+        $u->innerJoin('shop_group sg', 'sg.id = sgl.id_link');
+        $u->innerJoin('shop_group_translate tr', 'tr.id_group = sg.id');
         $u->orderBy();
-        $u->where('scg.id = ?', $id);
-
-        $items = $u->getList();
-        foreach ($items as $item) {
-            $linkGroup = null;
-            $linkGroup['id'] = $item['id'];
-            $linkGroup['name'] = $item['name'];
-            $result[] = $linkGroup;
-        }
-
-        return $result;
+        $u->where('sgl.id_group = ?', $id);
+        return $u->getList();
     }
 
     private function translate($name)
@@ -283,10 +275,10 @@ class Category extends Base
     protected function getAddInfo()
     {
         $result = [];
-//        $result["discounts"] = $this->getDiscounts();
+        $result["discounts"] = $this->getDiscounts();
         $result["images"] = $this->getImages();
-//        $result["deliveries"] = $this->getDeliveries();
-//        $result['linksGroups'] = $this->getLinksGroups();
+        $result["deliveries"] = $this->getDeliveries();
+        $result['linksGroups'] = $this->getLinksGroups();
 //        $result['parametersFilters'] = $this->getFilterParams();
         $result["childs"] = $this->getChilds();
 //        $result["modificationsGroups"] = (new Modification())->fetch();
