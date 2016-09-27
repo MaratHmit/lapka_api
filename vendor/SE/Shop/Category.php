@@ -84,7 +84,7 @@ class Category extends Base
 
         $result["select"] = "sg.*, tr.name name, 
                 GROUP_CONCAT(CONCAT_WS(':', sgtp.level, sgt.id_parent) SEPARATOR ';') ids_parents,
-                sgt.level level";
+                sgt.id_parent id_parent, sgt.level level";
         $joins[] = [
             "type" => "left",
             "table" => 'shop_group_translate tr',
@@ -172,15 +172,12 @@ class Category extends Base
             return $result;
 
         $u = new DB('shop_group_image', 'si');
-
-
-
-
+        $u->select('CONCAT(f.name, "/", img.name) image_path');
+        $u->innerJoin("image img", "img.id = si.id_image");
+        $u->innerJoin("image_folder f", "f.id = img.id_folder");
         $u->where('si.id_group = ?', $id);
         $u->orderBy("sort");
-        $objects = $u->getList();
-
-        return $result;
+        return $u->getList();
     }
 
     public function getDeliveries($idCategory = null)
@@ -262,17 +259,12 @@ class Category extends Base
     protected function getChilds()
     {
         $idParent = $this->input["id"];
-        if (CORE_VERSION == "5.3") {
-            $filter = array(
-                array("field" => "upid", "value" => $idParent),
-                array("field" => "level", "value" => ++$this->result["level"]));
-            $category = new Category(array("filters" => $filter));
-            $result = $category->fetch();
-        } else {
-            $filter = array("field" => "upid", "value" => $idParent);
-            $category = new Category(array("filters" => $filter));
-            $result = $category->fetch();
-        }
+        $filter = array(
+            array("field" => "idParent", "value" => $idParent),
+            array("field" => "level", "value" => ++$this->result["level"]));
+        $category = new Category(array("filters" => $filter));
+        $result = $category->fetch();
+
         return $result;
     }
 
@@ -292,11 +284,11 @@ class Category extends Base
     {
         $result = [];
 //        $result["discounts"] = $this->getDiscounts();
-        //$result["images"] = $this->getImages();
+        $result["images"] = $this->getImages();
 //        $result["deliveries"] = $this->getDeliveries();
 //        $result['linksGroups'] = $this->getLinksGroups();
 //        $result['parametersFilters'] = $this->getFilterParams();
-//        $result["childs"] = $this->getChilds();
+        $result["childs"] = $this->getChilds();
 //        $result["modificationsGroups"] = (new Modification())->fetch();
         return $result;
     }

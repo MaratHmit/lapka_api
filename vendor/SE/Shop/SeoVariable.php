@@ -6,7 +6,7 @@ use SE\DB as DB;
 
 class SeoVariable extends Base
 {
-    protected $tableName = "shop_variables";
+    protected $tableName = "shop_variable";
     protected $limit = null;
 
     public function fetch()
@@ -72,7 +72,9 @@ class SeoVariable extends Base
             $vars[] = $var;
         }
 
-        $u = new DB('shop_variables', 'sv');
+        $u = new DB('shop_variable', 'sv');
+        $u->select('sv.*, tr.name, tr.value');
+        $u->innerJoin('shop_variable_translate tr', 'tr.id_variable = sv.id');
         $u->orderBy('name');
         $objects = $u->getList();
         foreach ($objects as $item) {
