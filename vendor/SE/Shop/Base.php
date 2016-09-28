@@ -20,7 +20,7 @@ class Base
     protected $filterFields;
     protected $protocol = 'http';
     protected $search;
-    protected $filters = array();
+    protected $filters = [];
     protected $hostname;
     protected $urlImages;
     protected $dirImages = "images";
@@ -33,7 +33,7 @@ class Base
     protected $isNew;
     protected $idLang = 1;
 
-    private $patterns = array();
+    private $patterns = [];
 
     function __construct($input = null)
     {
@@ -48,7 +48,7 @@ class Base
         $this->sortBy = $input["sortBy"] ? $input["sortBy"] : $this->sortBy;
         $this->search = $input["searchText"] && $this->allowedSearch ? $input["searchText"] : null;
         $this->filters = empty($this->input["filters"]) || !is_array($this->input["filters"]) ?
-            array() : $this->input["filters"];
+            [] : $this->input["filters"];
         if (!empty($this->input["id"]) && empty($this->input["ids"]))
             $this->input["ids"] = array($this->input["id"]);
         $this->isNew = empty($this->input["id"]) && empty($this->input["ids"]);
@@ -106,7 +106,7 @@ class Base
 
     public function setFilters($filters)
     {
-        $this->filters = empty($filters) || !is_array($filters) ? array() : $filters;
+        $this->filters = empty($filters) || !is_array($filters) ? [] : $filters;
     }
 
     private function createTableForInfo($settings)
@@ -221,6 +221,7 @@ class Base
                 $result = $t->fetchOne();
                 if ($result["id"])
                     $data["id"] = $result["id"];
+                writeLog($data);
                 $t->setValuesFields($data);
                 $t->save();
             }
@@ -317,7 +318,7 @@ class Base
         return true;
     }
 
-    protected function correctValuesBeforeFetch($items = array())
+    protected function correctValuesBeforeFetch($items = [])
     {
         foreach ($items as &$item) {
             if (!empty($item["imagePath"])) {
@@ -335,17 +336,33 @@ class Base
 
     protected function getSettingsFetch()
     {
-        return array();
+        $translateTable = "{$this->tableName}_translate";
+        if (DB::existTable($translateTable)) {
+            $t = new DB($translateTable);
+            $linkName = $t->getColumns()[1];
+            return [
+                "select" => "{$this->tableAlias}.*, tr.name name",
+                "joins" => [
+                    [
+                        "type" => "left",
+                        "table" => "{$translateTable} tr",
+                        "condition" => "tr.{$linkName} = {$this->tableAlias}.id"
+                    ]
+                ]
+            ];
+        }
+        
+        return [];
     }
 
     protected function getSettingsInfo()
     {
-        return array();
+        return [];
     }
 
     protected function getPattensBySelect($selectQuery)
     {
-        $result = array();
+        $result = [];
         preg_match_all('/\w+[.]+\w+\s\w+/', $selectQuery, $matches);
         if (count($matches) && count($matches[0])) {
             foreach ($matches[0] as $match) {
@@ -359,9 +376,9 @@ class Base
         return $result;
     }
 
-    protected function getSearchQuery($searchFields = array())
+    protected function getSearchQuery($searchFields = [])
     {
-        $result = array();
+        $result = [];
         $searchItem = trim($this->search);
         if (empty($searchItem))
             return $result;
@@ -412,8 +429,8 @@ class Base
 
     protected function getFilterQuery()
     {
-        $where = array();
-        $filters = array();
+        $where = [];
+        $filters = [];
         if (!empty($this->filters["field"]))
             $filters[] = $this->filters;
         else $filters = $this->filters;
@@ -444,7 +461,7 @@ class Base
         return implode(" AND ", $where);
     }
 
-    protected function getWhereQuery($searchFields = array())
+    protected function getWhereQuery($searchFields = [])
     {
         $query = null;
         $searchQuery = $this->getSearchQuery($searchFields);
@@ -464,16 +481,16 @@ class Base
         if (!file_exists($file))
             return null;
 
-        $result = array();
+        $result = [];
         if (($handle = fopen($file, "r")) !== FALSE) {
             $i = 0;
-            $keys = array();
+            $keys = [];
             while (($row = fgetcsv($handle, 10000, $csvSeparator)) !== FALSE) {
                 if (!$i) {
                     foreach ($row as &$item)
                         $keys[] = iconv('CP1251', 'utf-8', $item);
                 } else {
-                    $object = array();
+                    $object = [];
                     $j = 0;
                     foreach ($row as &$item) {
                         $object[$keys[$j]] = iconv('CP1251', 'utf-8', $item);
@@ -492,7 +509,7 @@ class Base
     {
         $countFiles = count($_FILES);
         $ups = 0;
-        $items = array();
+        $items = [];
         $dir = DOCUMENT_ROOT . "/files";
         $url = !empty($_POST["url"]) ? $_POST["url"] : null;
         if (!file_exists($dir) || !is_dir($dir))

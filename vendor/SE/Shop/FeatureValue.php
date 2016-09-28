@@ -4,7 +4,7 @@ namespace SE\Shop;
 
 class FeatureValue extends Base
 {
-    protected $tableName = "shop_feature_value_list";
+    protected $tableName = "shop_feature_value";
     protected $sortBy = "sort";
     protected $sortOrder = "asc";
     

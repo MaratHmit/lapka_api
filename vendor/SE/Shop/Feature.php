@@ -13,26 +13,31 @@ class Feature extends Base
 
     protected function getSettingsFetch()
     {
-        return array(
-            "select" => 'sf.*, sfg.name name_group',
-            "joins" => array(
-                array(
+        return [
+            "select" => 'sf.*, tr.name name, sfg_tr.name name_group, m_tr.name measure',
+            "joins" => [
+                [
                     "type" => "left",
                     "table" => 'shop_feature_group sfg',
-                    "condition" => 'sfg.id = sf.id_feature_group'
-                ),
-                array(
+                    "condition" => 'sfg.id = sf.id_group'
+                ],
+                [
                     "type" => "left",
-                    "table" => 'shop_group_feature sgf',
-                    "condition" => 'sgf.id_feature = sf.id'
-                ),
-                array(
+                    "table" => 'shop_feature_translate tr',
+                    "condition" => 'tr.id_feature = sf.id'
+                ],
+                [
                     "type" => "left",
-                    "table" => 'shop_modifications_group smg',
-                    "condition" => 'sgf.id_group = smg.id'
-                )
-            )
-        );
+                    "table" => 'shop_feature_group_translate sfg_tr',
+                    "condition" => 'sfg_tr.id_group = sf.id_group'
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_measure_translate m_tr',
+                    "condition" => 'm_tr.id_measure = sf.id_measure'
+                ]
+            ]
+        ];
     }
 
     protected function getSettingsInfo()
@@ -47,6 +52,7 @@ class Feature extends Base
 
     protected function getAddInfo()
     {
+        $result["measure"] = (new Measure())->fetch();
         $result["values"] = $this->getValues();
         return $result;
     }

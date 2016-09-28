@@ -570,13 +570,15 @@ class DB
         if (empty($values)) {
             if (!empty($this->inputData["ids"]))
                 $this->dataValues["id"] = $this->inputData["ids"][0];
-            return $this->dataValues["id"];
+            if (!empty($this->dataValues["id"]))
+                return $this->dataValues["id"];
         }
 
         $query[] = $isInsert ? "INSERT INTO" : "UPDATE";
         $query[] = $this->tableName;
         $query[] = "SET";
         $query[] = $values;
+
         if (!$isInsert) {
             $query[] = "WHERE";
             if (empty($this->whereDefinitions))
