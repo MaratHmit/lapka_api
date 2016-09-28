@@ -31,12 +31,16 @@ class Base
     protected $allowedSearch = true;
     protected $availableSigns = array("=", "<=", "<", ">", ">=", "IN");
     protected $isNew;
+    protected $idLang = 1;
 
     private $patterns = array();
 
     function __construct($input = null)
     {
-        $input = $this->input = empty($input) || is_array($input) ? $input : json_decode($input, true);
+        $this->idLang = empty($_SESSION["idLang"]) ? $this->idLang : $_SESSION["idLang"];
+        $input = empty($input) || is_array($input) ? $input : json_decode($input, true);
+        $input["idLang"] = $this->idLang;
+        $this->input = $input;
         $this->hostname = HOSTNAME;
         $this->limit = $input["limit"] && $this->limit ? (int)$input["limit"] : $this->limit;
         $this->offset = $input["offset"] ? (int)$input["offset"] : $this->offset;
@@ -129,7 +133,6 @@ class Base
     public function fetch()
     {
         $settingsFetch = $this->getSettingsFetch();
-
         $settingsFetch["select"] = $settingsFetch["select"] ? $settingsFetch["select"] : "*";
         $this->patterns = $this->getPattensBySelect($settingsFetch["select"]);
         try {
@@ -203,6 +206,30 @@ class Base
         }
     }
 
+    protected function saveTranslate($tableName, $data)
+    {
+        try {
+            $translateTable = "{$tableName}_translate";
+            if (DB::existTable($translateTable)) {
+                $t = new DB($translateTable);
+                $linkName = $t->getColumns()[1];
+                $data[$linkName] = $data["id"];
+                unset($data["id"]);
+                unset($data["ids"]);
+                writeLog($data);
+                $t->where("{$linkName} = ?", $data[$linkName]);
+                $t->andWhere('id_lang = ?', $this->idLang);
+                $result = $t->fetchOne();
+                if ($result["id"])
+                    $data["id"] = $result["id"];
+                $t->setValuesFields($data);
+                $t->save();
+            }
+        } catch (Exception $e) {
+            $this->error = "Не удаётся сохранить информацию о наименование объекта";
+        }
+    }
+
     public function save()
     {
         try {
@@ -213,6 +240,8 @@ class Base
                 $this->input["idImage"] = $this->saveImage();
             $u->setValuesFields($this->input);
             $this->input["id"] = $u->save();
+            if ($this->input["id"])
+                $this->saveTranslate($this->tableName, $this->input);
             if (empty($this->input["ids"]) && $this->input["id"])
                 $this->input["ids"] = array($this->input["id"]);
             if ($this->input["id"] && $this->saveAddInfo()) {

@@ -15,7 +15,7 @@ class Brand extends Base
             "select" => 'sb.*, sbt.name name, CONCAT(f.name, "/", img.name) image_path',
             "joins" => [
                 [
-                    "type" => "inner",
+                    "type" => "left",
                     "table" => 'shop_brand_translate sbt',
                     "condition" => 'sb.id = sbt.id_brand'
                 ],
@@ -42,7 +42,7 @@ class Brand extends Base
                 CONCAT('/', IF(f.name IS NULL, '', CONCAT(f.name, '/')), img.name) image_path",
             "joins" => [
                 [
-                    "type" => "inner",
+                    "type" => "left",
                     "table" => 'shop_brand_translate sbt',
                     "condition" => 'sb.id = sbt.id_brand'
                 ],

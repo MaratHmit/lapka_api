@@ -111,7 +111,7 @@ class Category extends Base
             "select" => "sg.*, tr.id id_translate, tr.name, tr.description, tr.content,
                 tr.meta_title, tr.meta_keywords, tr.meta_description,               
                 GROUP_CONCAT(CONCAT_WS(':', sgtp.level, sgt.id_parent) SEPARATOR ';') ids_parents,
-                sgt.level level",
+                sgt.id_parent id_parent, sgt.level level",
             "joins" => [
                 [
                     "type" => "left",
@@ -172,11 +172,13 @@ class Category extends Base
             return $result;
 
         $u = new DB('shop_group_image', 'si');
-        $u->select('CONCAT(f.name, "/", img.name) image_path');
+        $u->select('si.id_image id, CONCAT(f.name, "/", img.name) image_path, si.is_main, tr.alt');
         $u->innerJoin("image img", "img.id = si.id_image");
         $u->innerJoin("image_folder f", "f.id = img.id_folder");
+        $u->leftJoin("image_translate tr", "tr.id_image = img.id");
         $u->where('si.id_group = ?', $id);
-        $u->orderBy("sort");
+        $u->andWhere('tr.id_lang = ?', $this->idLang);
+        $u->orderBy("si.sort");
         return $u->getList();
     }
 
@@ -189,64 +191,6 @@ class Category extends Base
 
         return $result;
     }
-
-    public function getLinksGroups($idCategory = null)
-    {
-        $result = array();
-        $id = $idCategory ? $idCategory : $this->input["id"];
-        if (!$id)
-            return $result;
-
-        $u = new DB('shop_group_link', 'sgl');
-        $u->select('sg.id, tr.name');
-        $u->innerJoin('shop_group sg', 'sg.id = sgl.id_link');
-        $u->innerJoin('shop_group_translate tr', 'tr.id_group = sg.id');
-        $u->orderBy();
-        $u->where('sgl.id_group = ?', $id);
-        return $u->getList();
-    }
-
-    private function translate($name)
-    {
-        if (strcmp($name, "price") === 0)
-            return "Цена";
-        if (strcmp($name, "brand") === 0)
-            return "Бренды";
-        if (strcmp($name, "flag_hit") === 0)
-            return "Хиты";
-        if (strcmp($name, "flag_new") === 0)
-            return "Новинки";
-        return $name;
-    }
-
-    public function getFilterParams($idCategory = null)
-    {
-        $result = array();
-        $id = $idCategory ? $idCategory : $this->input["id"];
-        if (!$id)
-            return $result;
-
-        $u = new DB('shop_group_filter', 'sgf');
-        $u->select('sgf.*, sf.name');
-        $u->leftJoin('shop_feature sf', 'sf.id = sgf.id_feature');
-        $u->where('sgf.id_group = ?', $id);
-        $u->orderBy('sgf.sort');
-        $items = $u->getList();
-
-        foreach ($items as $item) {
-            $filter = null;
-            $filter['id'] = $item['idFeature'];
-            $filter['name'] = $item['name'];
-            if (empty($filter['name']))
-                $filter['name'] = $this->translate($item['defaultFilter']);
-            $filter['code'] = $item['defaultFilter'];
-            $filter['sortIndex'] = (int)$item['sort'];
-            $filter['isActive'] = (bool)$item['expanded'];
-            $result[] = $filter;
-        }
-        return $result;
-    }
-
 
     protected function getChilds()
     {
@@ -278,10 +222,8 @@ class Category extends Base
         $result["discounts"] = $this->getDiscounts();
         $result["images"] = $this->getImages();
         $result["deliveries"] = $this->getDeliveries();
-        $result['linksGroups'] = $this->getLinksGroups();
-//        $result['parametersFilters'] = $this->getFilterParams();
         $result["childs"] = $this->getChilds();
-//        $result["modificationsGroups"] = (new Modification())->fetch();
+        $result["productTypes"] = (new ProductType())->fetch();
         return $result;
     }
 
@@ -344,73 +286,6 @@ class Category extends Base
         }
     }
 
-    private function saveLinksGroups()
-    {
-        try {
-            $idsGroups = $this->input["ids"];
-            $links = $this->input["linksGroups"];
-            $idsExists = array();
-            foreach ($links as $group)
-                if ($group["id"])
-                    $idsExists[] = $group["id"];
-            if (CORE_VERSION != "5.3")
-                $idsExists = array_diff($idsExists, $idsGroups);
-            $idsExistsStr = implode(",", $idsExists);
-            $idsStr = implode(",", $idsGroups);
-
-            $u = new DB('shop_crossgroup', 'scg');
-            if ($idsExistsStr)
-                $u->where("(NOT group_id IN ({$idsExistsStr})) AND id IN (?)", $idsStr)->deleteList();
-            else $u->where('id IN (?)', $idsStr)->deleteList();
-            $idsExists = array();
-            if ($idsExistsStr) {
-                $u->select("id, group_id");
-                $u->where("(group_id IN ({$idsExistsStr})) AND id IN (?)", $idsStr);
-                $objects = $u->getList();
-                foreach ($objects as $item) {
-                    $idsExists[] = $item["id"];
-                    $idsExists[] = $item["groupId"];
-                }
-            };
-            $data = array();
-            foreach ($links as $group)
-                if (empty($idsExists) || !in_array($group["id"], $idsExists))
-                    foreach ($idsGroups as $idGroup)
-                        $data[] = array('id' => $idGroup, 'group_id' => $group['id']);
-            if (!empty($data))
-                DB::insertList('shop_crossgroup', $data);
-        } catch (Exception $e) {
-            $this->error = "Не удаётся сохранить связанные категории!";
-            throw new Exception($this->error);
-        }
-    }
-
-    private function saveParametersFilters()
-    {
-        try {
-            $idsGroups = $this->input["ids"];
-            $filters = $this->input["parametersFilters"];
-
-            $idsStr = implode(",", $idsGroups);
-            $u = new DB('shop_group_filter', 'sgf');
-            $u->where('id_group IN (?)', $idsStr)->deleteList();
-
-            foreach ($filters as $filter) {
-                foreach ($idsGroups as $idGroup)
-                    if ($filter["id"] || !empty($filter["code"]))
-                        $data[] = array('id_group' => $idGroup, 'id_feature' => $filter["id"],
-                            'default_filter' => $filter["code"], 'expanded' => (int)$filter["isActive"],
-                            'sort' => (int)$filter["sortIndex"]);
-            }
-            if (!empty($data)) {
-                DB::insertList('shop_group_filter', $data);
-            }
-        } catch (Exception $e) {
-            $this->error = "Не удаётся сохранить фильтры параметров!";
-            throw new Exception($this->error);
-        }
-    }
-
     static public function getUrl($code, $id = null)
     {
         $code_n = $code;
@@ -467,31 +342,25 @@ class Category extends Base
     protected function correctValuesBeforeSave()
     {
         if (!$this->input["id"] && !$this->input["ids"] || isset($this->input["codeGr"])) {
-            if (empty($this->input["codeGr"]))
-                $this->input["codeGr"] = strtolower(se_translite_url($this->input["name"]));
-            $this->input["codeGr"] = $this->getUrl($this->input["codeGr"], $this->input["id"]);
+            if (empty($this->input["url"]))
+                $this->input["url"] = $this->transliterationUrl($this->input["name"]);
+            $this->input["url"] = $this->getUrl($this->input["url"], $this->input["id"]);
         }
-        if (isset($this->input["idModificationGroupDef"]) && empty($this->input["idModificationGroupDef"]))
-            $this->input["idModificationGroupDef"] = null;
-        if (isset($this->input["active"]) && is_bool($this->input["active"]))
-            $this->input["active"] = $this->input["active"] ? "Y" : "N";
     }
 
     protected function saveAddInfo()
     {
-        $this->input["ids"] = empty($this->input["ids"]) ? array($this->input["id"]) : $this->input["ids"];
-        if (!$this->input["ids"])
-            return false;
+//        $this->input["ids"] = empty($this->input["ids"]) ? array($this->input["id"]) : $this->input["ids"];
+//        if (!$this->input["ids"])
+//            return false;
+//
+//        $this->saveDiscounts();
+//        $this->saveImages();
+//
+//        $group = (new Category($this->input))->info();
+//        if ($group["idParent"] != $this->input["idParent"])
+//            self::saveIdParent($this->input["id"], $this->input["idParent"]);
 
-        $this->saveDiscounts();
-        $this->saveImages();
-        $this->saveLinksGroups();
-        $this->saveParametersFilters();
-        if (CORE_VERSION == "5.3" && isset($this->input["upid"])) {
-            $group = (new Category($this->input))->info();
-            if ($group["upid"] != $this->input["upid"])
-                self::saveIdParent($this->input["id"], $this->input["upid"]);
-        }
         return true;
     }
 }

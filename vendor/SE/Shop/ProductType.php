@@ -7,37 +7,20 @@ use SE\Exception;
 
 class ProductType extends Base
 {
-    protected $tableName = "shop_product_type";
-
-    protected function getSettingsFetch()
-    {
-        return array(
-            "select" => 'spt.*, GROUP_CONCAT(sf.name SEPARATOR \'; \') features',
-            "joins" => array(
-                array(
-                    "type" => "left",
-                    "table" => 'shop_product_type_feature sptf',
-                    "condition" => 'sptf.id_type = spt.id'
-                ),
-                array(
-                    "type" => "left",
-                    "table" => 'shop_feature sf',
-                    "condition" => 'sptf.id_feature = sf.id'
-                )
-            )
-        );
-    }
+    protected $tableName = "shop_type";
 
     private function getFeatures() {
 
         try {
             $id = $this->input["id"];
 
-            $u = new DB('shop_product_type_feature', 'sptf');
-            $u->select("sptf.id_feature id, sf.name, sf.type, sf.sort, sf.measure");
-            $u->innerJoin('shop_feature sf', 'sf.id = sptf.id_feature');
+            $u = new DB('shop_type_feature', 'stf');
+            $u->select("stf.id_feature id, tr.name, sf.type, sf.sort, sm_tr.name measure");
+            $u->innerJoin('shop_feature sf', 'sf.id = stf.id_feature');
+            $u->leftJoin('shop_feature_translate tr', 'tr.id_feature = sf.id');
+            $u->leftJoin('shop_measure_translate sm_tr', 'sm_tr.id_measure = sf.id_measure');
             $u->groupBy("sf.id");
-            $u->where('sptf.id_type = ?', $id);
+            $u->where('stf.id_type = ?', $id);
             return $u->getList();
         } catch (Exception $e) {
             $this->error = "Не удаётся получить список параметров типа!";

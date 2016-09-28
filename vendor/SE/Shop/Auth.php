@@ -44,6 +44,7 @@ class Auth extends Base
                 $_SESSION["hash"] = $this->input["hash"];
                 $_SESSION['isAuth'] = true;
                 $_SESSION['hostname'] = HOSTNAME;
+                $_SESSION['idLang'] = 1;
 
                 $this->result = $data;
             } else {
