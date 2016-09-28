@@ -216,7 +216,6 @@ class Base
                 $data[$linkName] = $data["id"];
                 unset($data["id"]);
                 unset($data["ids"]);
-                writeLog($data);
                 $t->where("{$linkName} = ?", $data[$linkName]);
                 $t->andWhere('id_lang = ?', $this->idLang);
                 $result = $t->fetchOne();
@@ -272,9 +271,9 @@ class Base
         return $result["id"];
     }
 
-    public function saveImage()
+    public function saveImage($imagePath = null)
     {
-        $imagePath = $this->input["imagePath"];
+        $imagePath = empty($imagePath) ? $this->input["imagePath"] : $imagePath;
         if (empty($imagePath))
             return null;
 

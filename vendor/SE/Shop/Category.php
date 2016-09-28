@@ -172,13 +172,14 @@ class Category extends Base
             return $result;
 
         $u = new DB('shop_group_image', 'si');
-        $u->select('si.id_image id, CONCAT(f.name, "/", img.name) image_path, si.is_main, tr.alt');
+        $u->select('si.id, si.id_image, tr.id id_translate, 
+                    CONCAT(f.name, "/", img.name) image_path, si.is_main, tr.alt, si.sort');
         $u->innerJoin("image img", "img.id = si.id_image");
-        $u->innerJoin("image_folder f", "f.id = img.id_folder");
-        $u->leftJoin("image_translate tr", "tr.id_image = img.id");
+        $u->leftJoin("image_folder f", "f.id = img.id_folder");
+        $u->leftJoin("image_translate tr", "tr.id_image = img.id AND tr.id_lang = {$this->idLang}");
         $u->where('si.id_group = ?', $id);
-        $u->andWhere('tr.id_lang = ?', $this->idLang);
         $u->orderBy("si.sort");
+
         return $u->getList();
     }
 
@@ -232,7 +233,7 @@ class Category extends Base
         try {
             foreach ($this->input["ids"] as $id)
                 DB::saveManyToMany($id, $this->input["discounts"],
-                    array("table" => "shop_discount_links", "key" => "id_group", "link" => "discount_id"));
+                    array("table" => "shop_discount_link", "key" => "id_group", "link" => "id_discount"));
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить скидки категории товара!";
             throw new Exception($this->error);
@@ -246,40 +247,55 @@ class Category extends Base
             $images = $this->input["images"];
             $idsStore = "";
             foreach ($images as $image) {
-                if ($image["id"] > 0) {
+                if ($image["id"]) {
                     if (!empty($idsStore))
                         $idsStore .= ",";
                     $idsStore .= $image["id"];
-                    $u = new DB('shop_group_img', 'si');
-                    $image["picture"] = $image["imageFile"];
-                    $image["sort"] = $image["sortIndex"];
-                    $image["pictureAlt"] = $image["imageAlt"];
+                    $u = new DB('shop_group_image', 'si');
                     $u->setValuesFields($image);
+                    $u->save();
+                }
+                if ($image["idImage"]) {
+                    if ($image["idTranslate"])
+                        $data["id"] = $image["idTranslate"];
+                    else {
+                        $data["idImage"] = $image["idImage"];
+                        $data["idLang"] = $this->idLang;
+                    }
+                    $data["alt"] = $image["alt"];
+                    $data["title"] = $image['title'];
+                    $u = new DB('image_translate');
+                    $u->setValuesFields($data);
                     $u->save();
                 }
             }
 
             $idsStr = implode(",", $idsGroups);
             if (!empty($idsStore)) {
-                $u = new DB('shop_group_img', 'si');
+                $u = new DB('shop_group_image', 'sgi');
                 $u->where("id_group IN ($idsStr) AND NOT (id IN (?))", $idsStore)->deleteList();
             } else {
-                $u = new DB('shop_group_img', 'si');
+                $u = new DB('shop_group_image', 'sgi');
                 $u->where('id_group IN (?)', $idsStr)->deleteList();
             }
 
-            $data = array();
+            $data = [];
+            $i = 0;
             foreach ($images as $image)
-                if (empty($image["id"]) || ($image["id"] <= 0)) {
-                    foreach ($idsGroups as $idProduct) {
-                        $data[] = array('id_group' => $idProduct, 'picture' => $image["imageFile"],
-                            'sort' => (int)$image["sortIndex"], 'picture_alt' => $image["imageAlt"]);
-                        $newImages[] = $image["imageFile"];
+                if (empty($image["id"])) {
+                    foreach ($idsGroups as $idGroup) {
+                        if ($idImage = $this->saveImage($image["imagePath"]))
+                            $data[] = ['id_group' => $idGroup, 'id_image' => $idImage, 'sort' => (int)$image["sort"],
+                                'is_main' => !$i++];
+                            $dataTranslate[] = ['id_image' => $idImage, 'id_lang' => $this->idLang,
+                                'title' => $image["title"], 'alt' => $image["alt"]];
                     }
                 }
 
             if (!empty($data))
-                DB::insertList('shop_group_img', $data);
+                DB::insertList('shop_group_image', $data);
+            if (!empty($dataTranslate))
+                DB::insertList('image_translate', $dataTranslate);
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить изображения категории товара!";
             throw new Exception($this->error);
@@ -324,7 +340,7 @@ class Category extends Base
             DB::query("DELETE FROM shop_group_tree WHERE id_child = {$id}");
 
             $sqlGroupTree = "INSERT INTO shop_group_tree (id_parent, id_child, `level`)
-                                SELECT id_parent, :id, `level` FROM shop_group_tree
+                                SELECT id_parent, :id, :level FROM shop_group_tree
                                 WHERE id_child = :id_parent
                                 UNION ALL
                                 SELECT :id, :id, :level";
@@ -346,20 +362,42 @@ class Category extends Base
                 $this->input["url"] = $this->transliterationUrl($this->input["name"]);
             $this->input["url"] = $this->getUrl($this->input["url"], $this->input["id"]);
         }
+        if (isset($this->input["idType"]) && empty($this->input["idType"]))
+            $this->input["idType"] = null;
+    }
+
+    protected function saveChilds()
+    {
+        $idParent = $this->input["id"];
+        $oldChilds = $this->getChilds();
+        $idsOldChilds = [];
+        foreach ($oldChilds as $oldChild)
+            $idsOldChilds[] = $oldChild["id"];
+        $childs = $this->input["childs"];
+        $idsChilds = [];
+        foreach ($childs as $child)
+            $idsChilds[] = $child["id"];
+        $idsNewChilds =  array_diff($idsChilds, $idsOldChilds);
+        $idsDelChilds = array_diff($idsOldChilds, $idsChilds);
+        foreach ($idsNewChilds as $idNewChild)
+            self::saveIdParent($idNewChild, $idParent);
+        foreach ($idsDelChilds as $idDelChild)
+            self::saveIdParent($idDelChild, null);
     }
 
     protected function saveAddInfo()
     {
-//        $this->input["ids"] = empty($this->input["ids"]) ? array($this->input["id"]) : $this->input["ids"];
-//        if (!$this->input["ids"])
-//            return false;
-//
-//        $this->saveDiscounts();
-//        $this->saveImages();
-//
-//        $group = (new Category($this->input))->info();
-//        if ($group["idParent"] != $this->input["idParent"])
-//            self::saveIdParent($this->input["id"], $this->input["idParent"]);
+        $this->input["ids"] = empty($this->input["ids"]) ? array($this->input["id"]) : $this->input["ids"];
+        if (!$this->input["ids"])
+            return false;
+
+        $this->saveDiscounts();
+        $this->saveImages();
+        $this->saveChilds();
+
+        $group = (new Category($this->input))->info();
+        if ($this->isNew || ($group["idParent"] != $this->input["idParent"]))
+            self::saveIdParent($this->input["id"], $this->input["idParent"]);
 
         return true;
     }
