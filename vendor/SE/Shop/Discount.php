@@ -7,21 +7,7 @@ use SE\Exception;
 
 class Discount extends Base
 {
-    protected $tableName = "shop_discounts";
-    protected $sortBy = "sort";
-    protected $sortOrder = "asc";
-
-    protected function getSettingsFetch()
-    {
-        return array(
-            "select" => 'sd.*',
-            "left" => array(
-                "type" => "inner",
-                "table" => 'shop_discount_links sdl',
-                "condition" => 'sdl.discount_id = sd.id'
-            )
-        );
-    }
+    protected $tableName = "shop_discount";
 
     protected function getAddInfo()
     {
@@ -33,7 +19,7 @@ class Discount extends Base
 
     private function getListProducts($id) {
         try {
-            $u = new seTable('shop_discount_links', 'sdl');
+            $u = new seTable('shop_discount_link', 'sdl');
             $u->select('sp.id, sp.code, sp.article, sp.name, sp.price, sp.curr');
             $u->innerJoin("shop_price sp", "sdl.id_price = sp.id");
             $u->where("sdl.discount_id = $id");
@@ -46,7 +32,7 @@ class Discount extends Base
 
     private function getListGroupsProducts($id) {
         try {
-            $u = new seTable('shop_discount_links', 'sdl');
+            $u = new seTable('shop_discount_link', 'sdl');
             $u->select('sg.id, sg.code_gr, sg.name');
             $u->innerJoin("shop_group sg", "sdl.id_group = sg.id");
             $u->where("sdl.discount_id = $id");
@@ -59,7 +45,7 @@ class Discount extends Base
 
     private function getListContacts($id) {
         try {
-            $u = new seTable('shop_discount_links', 'sdl');
+            $u = new seTable('shop_discount_link', 'sdl');
             $u->select('p.id, p.first_name, p.sec_name, p.last_name, p.email');
             $u->innerJoin("person p", "sdl.id_user = p.id");
             $u->where("sdl.discount_id = $id");

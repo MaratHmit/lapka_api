@@ -57,6 +57,12 @@ class Feature extends Base
         return $result;
     }
 
+    protected function correctValuesBeforeSave()
+    {
+        if (isset($this->input["idMeasure"]) && empty($this->input["idMeasure"]))
+            $this->input["idMeasure"] = null;
+    }
+
     private function saveValues()
     {
         if (!isset($this->input["values"]))
@@ -71,28 +77,28 @@ class Feature extends Base
                     if (!empty($idsStore))
                         $idsStore .= ",";
                     $idsStore .= $value["id"];
-                    $u = new DB('shop_feature_value_list');
+                    $u = new DB('shop_feature_value');
                     $u->setValuesFields($value);
                     $u->save();
                 }
             }
 
             if (!empty($idsStore)) {
-                $u = new DB('shop_feature_value_list');
+                $u = new DB('shop_feature_value');
                 $u->where("id_feature = {$idFeature} AND NOT (id IN (?))", $idsStore)->deleteList();
             } else {
-                $u = new DB('shop_feature_value_list');
+                $u = new DB('shop_feature_value');
                 $u->where("id_feature = ?", $idFeature)->deleteList();
             }
 
             $data = array();
             foreach ($values as $value)
                 if (empty($value["id"]) || ($value["id"] <= 0)) {
-                    $data[] = array('id_feature' => $idFeature, 'value' => $value["value"], 'color' => $value["color"],
-                        'sort' => (int) $value["sort"], 'image' => $value["image"]);
+                    $data[] = array('id_feature' => $idFeature, 'value' => $value["value"],
+                        'sort' => (int) $value["sort"]);
                 }
             if (!empty($data))
-                DB::insertList('shop_feature_value_list', $data);
+                DB::insertList('shop_feature_value', $data);
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить значения параметра!";
             throw new Exception($this->error);

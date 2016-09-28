@@ -576,8 +576,11 @@ class DB
 
         $query[] = $isInsert ? "INSERT INTO" : "UPDATE";
         $query[] = $this->tableName;
-        $query[] = "SET";
-        $query[] = $values;
+        if (!empty($values)) {
+            $query[] = "SET";
+            $query[] = $values;
+        } elseif ($isInsert)
+            $query[] = "() VALUE ()";
 
         if (!$isInsert) {
             $query[] = "WHERE";
@@ -590,7 +593,8 @@ class DB
             $sql = implode($query, " ");
             self::$lastQuery = $this->rawQuery = $sql;
             $stmt = self::$dbh->prepare($sql);
-            $this->bindValues($stmt);
+            if (!empty($values))
+                $this->bindValues($stmt);
 
             if ($stmt->execute()) {
                 if ($isInsert && !$isInsertId)

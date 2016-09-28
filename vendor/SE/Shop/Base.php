@@ -16,6 +16,7 @@ class Base
     protected $offset = 0;
     protected $sortBy = "id";
     protected $sortOrder = "desc";
+    protected $sortFieldName = "sort";
     protected $availableFields;
     protected $filterFields;
     protected $protocol = 'http';
@@ -134,7 +135,7 @@ class Base
     {
         $settingsFetch = $this->getSettingsFetch();
         $settingsFetch["select"] = $settingsFetch["select"] ? $settingsFetch["select"] : "*";
-        $this->patterns = $this->getPattensBySelect($settingsFetch["select"]);
+        $this->patterns = $this->getPatternsBySelect($settingsFetch["select"]);
         try {
             $u = $this->createTableForInfo($settingsFetch);
             $searchFields = $u->getFields();
@@ -238,6 +239,9 @@ class Base
             $u = new DB($this->tableName);
             if (isset($this->input["imagePath"]))
                 $this->input["idImage"] = $this->saveImage();
+            if ($this->isNew && !isset($this->input[$this->sortFieldName]) &&
+                in_array($this->sortFieldName, $u->getColumns()))
+                $this->input[$this->sortFieldName] = $this->getNewSortIndex();
             $u->setValuesFields($this->input);
             $this->input["id"] = $u->save();
             if ($this->input["id"])
@@ -313,6 +317,14 @@ class Base
         }
     }
 
+    protected function getNewSortIndex()
+    {
+        $u = new DB($this->tableName);
+        $u->select("MAX({$this->sortFieldName}) sort");
+        $result = $u->fetchOne();
+        return ++$result["sort"];
+    }
+
     protected function correctValuesBeforeSave()
     {
         return true;
@@ -357,10 +369,10 @@ class Base
 
     protected function getSettingsInfo()
     {
-        return [];
+        return $this->getSettingsFetch();
     }
 
-    protected function getPattensBySelect($selectQuery)
+    protected function getPatternsBySelect($selectQuery)
     {
         $result = [];
         preg_match_all('/\w+[.]+\w+\s\w+/', $selectQuery, $matches);

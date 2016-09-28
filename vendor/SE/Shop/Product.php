@@ -8,6 +8,8 @@ use SE\Exception;
 class Product extends Base
 {
     protected $tableName = "shop_product";
+    private  $codePrice = "retail";
+    private $idTypePrice;
     private $newImages;
     private $rusCols = array("id" => "Ид.", "article" => "Артикул", "code" => "Код", "name" => "Наименование",
         "price" => "Цена", "count" => "Кол-во", "category" => "Категория", "weight" => "Вес", "volume" => "Объем",
@@ -15,12 +17,55 @@ class Product extends Base
         "features" => "Характеристики", "images" => 'Изображения', "codeCurrency" => "КодВалюты",
         "metaHeader" => "MetaHeader", "metaKeywords" => "MetaKeywords", "metaDescription" => "MetaDescription");
 
+    public function fetch()
+    {
+        if (empty($_SESSION["idTypePrice"])) {
+            $t = new DB("shop_typeprice");
+            $t->select("id");
+            $t->where("code = '?'", $this->codePrice);
+            $result = $t->fetchOne();
+            $_SESSION["idTypePrice"] = $result["id"];
+        }
+        $this->idTypePrice = $_SESSION["idTypePrice"];
+        return parent::fetch();
+    }
+
     protected function getSettingsFetch()
     {
-        $select = 'sp.*';
-        $result["select"] = $select;
-
-        return $result;
+        return [
+            "select" => 'sp.*, tr.name name, 
+                GROUP_CONCAT(so.article SEPARATOR ", ") article,
+                GROUP_CONCAT(sop.value SEPARATOR ", ") price,  
+                sbt.name name_brand',
+            "joins" => [
+                [
+                    "type" => "left",
+                    "table" => 'shop_product_translate tr',
+                    "condition" => 'tr.id_product = sp.id'
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_brand_translate sbt',
+                    "condition" => 'sbt.id_brand = sp.id_brand'
+                ],
+                [
+                    "type" => "inner",
+                    "table" => 'shop_offer so',
+                    "condition" => "so.id_product = sp.id"
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_offer_price sop',
+                    "condition" => "sop.id_offer = so.id AND sop.id_typeprice = {$this->idTypePrice}"
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_currency sc',
+                    "condition" => "sc.id = sop.id_currency"
+                ]
+            ],
+            "patterns" => [ "article" => "so.article", "price" => "so.price"]
+        ];
     }
 
     protected function getSettingsInfo()
