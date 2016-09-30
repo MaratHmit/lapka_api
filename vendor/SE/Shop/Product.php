@@ -318,22 +318,6 @@ class Product extends Base
         return $result;
     }
 
-    private function getUrl($code, $id, $existCodes = array())
-    {
-        $code_n = $code;
-        $id = (int)$id;
-        $u = new DB('shop_price', 'sp');
-        $i = 1;
-        while ($i < 1000) {
-            $data = $u->findList("sp.code = '$code_n' AND id <> {$id}")->fetchOne();
-            if ($data["id"] || in_array($code_n, $existCodes))
-                $code_n = $code . "-$i";
-            else return $code_n;
-            $i++;
-        }
-        return uniqid();
-    }
-
     protected function correctValuesBeforeSave()
     {
         if (!$this->input["id"] && !$this->input["ids"] || isset($this->input["code"])) {

@@ -58,7 +58,6 @@ class Base
             foreach ($worlds as $world)
                 $this->tableAlias .= $world[0];
         }
-        $this->init();
     }
 
     protected function init()
@@ -82,6 +81,7 @@ class Base
     {
         try {
             DB::initConnection($connection);
+            $this->init();
             return true;
         } catch (Exception $e) {
             $this->error = 'Не удаётся подключиться к базе данных!';
@@ -228,7 +228,6 @@ class Base
                 $result = $t->fetchOne();
                 if ($result["id"])
                     $data["id"] = $result["id"];
-                writeLog($data);
                 $t->setValuesFields($data);
                 $t->save();
             }
@@ -246,8 +245,16 @@ class Base
             if (isset($this->input["imagePath"]))
                 $this->input["idImage"] = $this->saveImage();
             if ($this->isNew && !isset($this->input[$this->sortFieldName]) &&
-                in_array($this->sortFieldName, $u->getColumns()))
+                in_array($this->sortFieldName, $u->getColumns())
+            )
                 $this->input[$this->sortFieldName] = $this->getNewSortIndex();
+            if (($this->isNew || isset($this->input["url"])) &&
+                in_array("url", $u->getColumns())
+            ) {
+                if (empty($this->input["url"]))
+                    $this->input["url"] = $this->transliterationUrl($this->input["name"]);
+                $this->input["url"] = $this->getUrl($this->input["url"], $this->input["id"]);
+            }
             $u->setValuesFields($this->input);
             $this->input["id"] = $u->save();
             if ($this->input["id"])
@@ -354,23 +361,73 @@ class Base
 
     protected function getSettingsFetch()
     {
+        $result = [];
+        $select = [];
+        $joins = [];
+        if ($translate = $this->getSettingsFetchTranslate()) {
+            $select[] = $translate["select"];
+            $joins = array_merge($joins, $translate["joins"]);
+        }
+        if ($image = $this->getSettingsFetchImage()) {
+            $select[] = $image["select"];
+            $joins = array_merge($joins, $image["joins"]);
+        }
+        if ($select)
+            $result["select"] = implode(", ", $select);
+        if ($joins)
+            $result["joins"] = $joins;
+
+        return $result;
+    }
+
+    protected function getSettingsFetchTranslate()
+    {
         $translateTable = "{$this->tableName}_translate";
         if (DB::existTable($translateTable)) {
+            $alias = DB::getAliasByTableName($translateTable);
             $t = new DB($translateTable);
-            $linkName = $t->getColumns()[1];
+            $columns = $t->getColumns();
+            $linkName = $columns[1];
+            $selectFields = [];
+            for ($i = 3; $i < count($columns) - 2; ++$i)
+                $selectFields[] = "{$alias}.$columns[$i] $columns[$i]";
+            $selectFields = implode(", ", $selectFields);
             return [
-                "select" => "{$this->tableAlias}.*, tr.name name",
+                "select" => "{$this->tableAlias}.*, {$selectFields}",
                 "joins" => [
                     [
                         "type" => "left",
-                        "table" => "{$translateTable} tr",
-                        "condition" => "tr.{$linkName} = {$this->tableAlias}.id"
+                        "table" => "{$translateTable} {$alias}",
+                        "condition" => "{$alias}.{$linkName} = {$this->tableAlias}.id AND {$alias}.id_lang = {$this->idLang}"
                     ]
                 ]
             ];
         }
-        
+
         return [];
+    }
+
+    protected function getSettingsFetchImage()
+    {
+        $columns = (new DB($this->tableName))->getColumns();
+        if (!in_array("id_image", $columns))
+            return [];
+
+        return [
+            "select" => "CONCAT('/', IF(img_fld.name IS NULL, '', CONCAT(img_fld.name, '/')), img.name) image_path",
+            "joins" => [
+                [
+                    "type" => "left",
+                    "table" => 'image img',
+                    "condition" => "{$this->tableAlias}.id_image = img.id"
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'image_folder img_fld',
+                    "condition" => 'img.id_folder = img_fld.id'
+                ]
+            ]
+        ];
     }
 
     protected function getSettingsInfo()
@@ -560,52 +617,69 @@ class Base
         return $items;
     }
 
-    function rusToTransliteration($string)
+    public function getUrl($url, $id = null)
+    {
+        $urlNew = $url;
+        $id = (int)$id;
+        $u = new DB($this->tableName);
+        $i = 1;
+        while ($i < 10) {
+            $data = $u->findList("url = '$urlNew' AND id <> {$id}")->fetchOne();
+            if ($data["id"])
+                $urlNew = $url . "-$i";
+            else return $urlNew;
+            $i++;
+        }
+        return uniqid();
+    }
+
+    public function rusToTransliteration($string)
     {
         $converter = array(
-            'а' => 'a',   'б' => 'b',   'в' => 'v',
-            'г' => 'g',   'д' => 'd',   'е' => 'e',
-            'ё' => 'e',   'ж' => 'zh',  'з' => 'z',
-            'и' => 'i',   'й' => 'y',   'к' => 'k',
-            'л' => 'l',   'м' => 'm',   'н' => 'n',
-            'о' => 'o',   'п' => 'p',   'р' => 'r',
-            'с' => 's',   'т' => 't',   'у' => 'u',
-            'ф' => 'f',   'х' => 'h',   'ц' => 'c',
-            'ч' => 'ch',  'ш' => 'sh',  'щ' => 'sch',
-            'ь' => "",  'ы' => 'y',   'ъ' => "",
-            'э' => 'e',   'ю' => 'yu',  'я' => 'ya',
+            'а' => 'a', 'б' => 'b', 'в' => 'v',
+            'г' => 'g', 'д' => 'd', 'е' => 'e',
+            'ё' => 'e', 'ж' => 'zh', 'з' => 'z',
+            'и' => 'i', 'й' => 'y', 'к' => 'k',
+            'л' => 'l', 'м' => 'm', 'н' => 'n',
+            'о' => 'o', 'п' => 'p', 'р' => 'r',
+            'с' => 's', 'т' => 't', 'у' => 'u',
+            'ф' => 'f', 'х' => 'h', 'ц' => 'c',
+            'ч' => 'ch', 'ш' => 'sh', 'щ' => 'sch',
+            'ь' => "", 'ы' => 'y', 'ъ' => "",
+            'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
 
-            'А' => 'A',   'Б' => 'B',   'В' => 'V',
-            'Г' => 'G',   'Д' => 'D',   'Е' => 'E',
-            'Ё' => 'E',   'Ж' => 'Zh',  'З' => 'Z',
-            'И' => 'I',   'Й' => 'Y',   'К' => 'K',
-            'Л' => 'L',   'М' => 'M',   'Н' => 'N',
-            'О' => 'O',   'П' => 'P',   'Р' => 'R',
-            'С' => 'S',   'Т' => 'T',   'У' => 'U',
-            'Ф' => 'F',   'Х' => 'H',   'Ц' => 'C',
-            'Ч' => 'Ch',  'Ш' => 'Sh',  'Щ' => 'Sch',
-            'Ь' => "",  'Ы' => 'Y',   'Ъ' => "",
-            'Э' => 'E',   'Ю' => 'Yu',  'Я' => 'Ya',
-            '«' => '', 	   '»' => '',   '"' => '',
-            '`' => '',    '\'' => '',
+            'А' => 'A', 'Б' => 'B', 'В' => 'V',
+            'Г' => 'G', 'Д' => 'D', 'Е' => 'E',
+            'Ё' => 'E', 'Ж' => 'Zh', 'З' => 'Z',
+            'И' => 'I', 'Й' => 'Y', 'К' => 'K',
+            'Л' => 'L', 'М' => 'M', 'Н' => 'N',
+            'О' => 'O', 'П' => 'P', 'Р' => 'R',
+            'С' => 'S', 'Т' => 'T', 'У' => 'U',
+            'Ф' => 'F', 'Х' => 'H', 'Ц' => 'C',
+            'Ч' => 'Ch', 'Ш' => 'Sh', 'Щ' => 'Sch',
+            'Ь' => "", 'Ы' => 'Y', 'Ъ' => "",
+            'Э' => 'E', 'Ю' => 'Yu', 'Я' => 'Ya',
+            '«' => '', '»' => '', '"' => '',
+            '`' => '', '\'' => '',
         );
         return strtr($string, $converter);
     }
 
-    function transliterationUrl($string){
-        $string = str_replace(array(' ', '*', '–', '°', '№','%20', ',', '.', '!', '?', '&', '(',')','<','>','{','}',' ', '_', '/', ':'), '-', $string);
+    public function transliterationUrl($string)
+    {
+        $string = str_replace(array(' ', '*', '–', '°', '№', '%20', ',', '.', '!', '?', '&', '(', ')', '<', '>', '{', '}', ' ', '_', '/', ':'), '-', $string);
         $string = str_replace(array('`', "'", "’"), '', $string);
 
         $result = $str = preg_replace('~[^-A-Za-z0-9_]+~u', '-', $this->rusToTransliteration($string));
-        while (strpos($result, '--')!==false) {
-            $result = str_replace('--','-', $result);
+        while (strpos($result, '--') !== false) {
+            $result = str_replace('--', '-', $result);
         }
-        if (strlen($result)){
+        if (strlen($result)) {
             if (substr($result, 0, 1) == '-') {
-                $result = substr($result, 1, strlen($result) -1);
+                $result = substr($result, 1, strlen($result) - 1);
             }
-            if (substr($result, strlen($result)-1, 1) == '-') {
-                $result = substr($result, 0, strlen($result) -1);
+            if (substr($result, strlen($result) - 1, 1) == '-') {
+                $result = substr($result, 0, strlen($result) - 1);
             }
         }
         return strtolower($result);

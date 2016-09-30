@@ -375,6 +375,7 @@ class DB
             }
             return $items;
         } catch (\PDOException $e) {
+            writeLog($e->getMessage());
             throw new Exception($e->getMessage());
         }
     }
@@ -663,7 +664,7 @@ class DB
         $this->joins[] = array("type" => $type, "name" => $tableName, "condition" => $condition);
     }
 
-    private function getAliasByTableName($tableName)
+    static public function getAliasByTableName($tableName)
     {
         $result = null;
         $tableName = trim($tableName, "`");

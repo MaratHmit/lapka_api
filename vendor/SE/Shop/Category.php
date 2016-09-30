@@ -302,22 +302,6 @@ class Category extends Base
         }
     }
 
-    static public function getUrl($code, $id = null)
-    {
-        $code_n = $code;
-        $id = (int)$id;
-        $u = new DB('shop_group', 'sg');
-        $i = 1;
-        while ($i < 1000) {
-            $data = $u->findList("sg.url = '$code_n' AND id <> {$id}")->fetchOne();
-            if ($data["id"])
-                $code_n = $code . "-$i";
-            else return $code_n;
-            $i++;
-        }
-        return uniqid();
-    }
-
     static public function getLevel($id)
     {
         $level = 0;
@@ -357,11 +341,6 @@ class Category extends Base
 
     protected function correctValuesBeforeSave()
     {
-        if (!$this->input["id"] && !$this->input["ids"] || isset($this->input["codeGr"])) {
-            if (empty($this->input["url"]))
-                $this->input["url"] = $this->transliterationUrl($this->input["name"]);
-            $this->input["url"] = $this->getUrl($this->input["url"], $this->input["id"]);
-        }
         if (isset($this->input["idType"]) && empty($this->input["idType"]))
             $this->input["idType"] = null;
     }
