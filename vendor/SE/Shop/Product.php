@@ -8,7 +8,7 @@ use SE\Exception;
 class Product extends Base
 {
     protected $tableName = "shop_product";
-    private  $codePrice = "retail";
+    private $codePrice = "retail";
     private $idTypePrice;
     private $newImages;
     private $rusCols = array("id" => "Ид.", "article" => "Артикул", "code" => "Код", "name" => "Наименование",
@@ -17,7 +17,7 @@ class Product extends Base
         "features" => "Характеристики", "images" => 'Изображения', "codeCurrency" => "КодВалюты",
         "metaHeader" => "MetaHeader", "metaKeywords" => "MetaKeywords", "metaDescription" => "MetaDescription");
 
-    public function fetch()
+    protected function init()
     {
         if (empty($_SESSION["idTypePrice"])) {
             $t = new DB("shop_typeprice");
@@ -27,16 +27,14 @@ class Product extends Base
             $_SESSION["idTypePrice"] = $result["id"];
         }
         $this->idTypePrice = $_SESSION["idTypePrice"];
-        return parent::fetch();
     }
 
     protected function getSettingsFetch()
     {
         return [
-            "select" => 'sp.*, tr.name name, 
-                GROUP_CONCAT(so.article SEPARATOR ", ") article,
-                GROUP_CONCAT(sop.value SEPARATOR ", ") price,  
-                sbt.name name_brand',
+            "select" => 'sp.*, tr.name name, so.article article,
+                sop.value price, sbt.name name_brand, sgt.name name_group,
+                CONCAT(f.name, "/", img.name) image_path',
             "joins" => [
                 [
                     "type" => "left",
@@ -62,15 +60,59 @@ class Product extends Base
                     "type" => "left",
                     "table" => 'shop_currency sc',
                     "condition" => "sc.id = sop.id_currency"
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_product_group spg',
+                    "condition" => "spg.id_product = sp.id"
+
+                ],
+                [
+                    "type" => "left",
+                    "table" => "shop_group_translate sgt",
+                    "condition" => "sgt.id_group = spg.id_group"
+                ],
+                [
+                    "type" => "left",
+                    "table" => "shop_product_image spi",
+                    "condition" => "spi.id_product = sp.id AND spi.is_main"
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'image img',
+                    "condition" => 'img.id = spi.id_image'
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'image_folder f',
+                    "condition" => 'img.id_folder = f.id'
                 ]
-            ],
-            "patterns" => [ "article" => "so.article", "price" => "so.price"]
+            ]
         ];
     }
 
     protected function getSettingsInfo()
     {
-        return $this->getSettingsFetch();
+        return [
+            "select" => 'sp.*, tr.name name',
+            "joins" => [
+                [
+                    "type" => "left",
+                    "table" => 'shop_product_translate tr',
+                    "condition" => 'tr.id_product = sp.id'
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_brand_translate sbt',
+                    "condition" => 'sbt.id_brand = sp.id_brand'
+                ],
+                [
+                    "type" => "inner",
+                    "table" => 'shop_offer so',
+                    "condition" => "so.id_product = sp.id"
+                ]
+            ]
+        ];
     }
 
     public function getImages($idProduct = null)
@@ -80,34 +122,16 @@ class Product extends Base
         if (!$id)
             return $result;
 
-        $u = new DB('shop_img', 'si');
-        $u->where('si.id_price = ?', $id);
-        $u->orderBy("sort");
-        $objects = $u->getList();
+        $u = new DB('shop_product_image', 'si');
+        $u->select('si.id, si.id_image, tr.id id_translate, 
+                    CONCAT(f.name, "/", img.name) image_path, si.is_main, tr.alt, si.sort');
+        $u->innerJoin("image img", "img.id = si.id_image");
+        $u->leftJoin("image_folder f", "f.id = img.id_folder");
+        $u->leftJoin("image_translate tr", "tr.id_image = img.id AND tr.id_lang = {$this->idLang}");
+        $u->where('si.id_product = ?', $id);
+        $u->orderBy("si.sort");
 
-        foreach ($objects as $item) {
-            $image = null;
-            $image['id'] = $item['id'];
-            $image['imageFile'] = $item['picture'];
-            $image['imageAlt'] = $item['pictureAlt'];
-            $image['sortIndex'] = $item['sort'];
-            $image['isMain'] = (bool)$item['default'];
-            if ($image['imageFile']) {
-                if (strpos($image['imageFile'], "://") === false) {
-                    $image['imageUrl'] = 'http://' . HOSTNAME . "/images/rus/shopprice/" . $image['imageFile'];
-                    $image['imageUrlPreview'] = "http://" . HOSTNAME . "/lib/image.php?size=64&img=images/rus/shopprice/" . $image['imageFile'];
-                } else {
-                    $image['imageUrl'] = $image['imageFile'];
-                    $image['imageUrlPreview'] = $image['imageFile'];
-                }
-            }
-            if (empty($product["imageFile"]) && $image['isMain']) {
-                $product["imageFile"] = $image['imageFile'];
-                $product["imageAlt"] = $image['imageAlt'];
-            }
-            $result[] = $image;
-        }
-        return $result;
+        return $u->getList();
     }
 
     public function getSpecifications($idProduct = null)
@@ -118,24 +142,24 @@ class Product extends Base
             return $result;
 
         try {
-            $u = new DB('shop_modifications_feature', 'smf');
-            $u->select('sfg.id id_group, sfg.name group_name, sf.name,
-						sf.type, sf.measure, smf.*, sfvl.value, sfvl.color, sfg.sort index_group');
-            $u->innerJoin('shop_feature sf', 'sf.id = smf.id_feature');
-            $u->leftJoin('shop_feature_value_list sfvl', 'smf.id_value = sfvl.id');
-            $u->leftJoin('shop_feature_group sfg', 'sfg.id = sf.id_feature_group');
-            $u->where('smf.id_price = ? AND smf.id_modification IS NULL', $id);
+            $u = new DB('shop_product_feature', 'spf');
+            $u->select('sfg.id id_group, sfg_tr.name group_name, sf_tr.name,
+						sf.type, spf.value, sfv.color, sfg.sort index_group');
+            $u->innerJoin('shop_feature sf', 'sf.id = spf.id_feature');
+            $u->innerJoin('shop_feature_translate sf_tr', 'sf_tr.id_feature = sf.id');
+            $u->leftJoin('shop_feature_value sfv', 'sfv.id = spf.id_value');
+            $u->leftJoin('shop_feature_group sfg', 'sfg.id = sf.id_group');
+            $u->leftJoin('shop_feature_group_translate sfg_tr', 'sfg_tr.id_group = sfg.id');
+            $u->where('spf.id_product = ?', $id);
             $u->orderBy('sfg.sort');
             $u->addOrderBy('sf.sort');
             $items = $u->getList();
             $result = array();
             foreach ($items as $item) {
                 if ($item["type"] == "number")
-                    $item["value"] = (real)$item["valueNumber"];
-                elseif ($item["type"] == "string")
-                    $item["value"] = $item["valueString"];
+                    $item["value"] = (real) $item["value"];
                 elseif ($item["type"] == "bool")
-                    $item["value"] = (bool)$item["valueBool"];
+                    $item["value"] = (bool) $item["value"];
                 $result[] = $item;
             }
             return $result;
@@ -209,162 +233,59 @@ class Product extends Base
         return (new Review())->fetchByIdProduct($id);
     }
 
-    public function getCrossGroups($idProduct = null)
+    public function getGroups($idProduct = null)
     {
         $result = array();
         $id = $idProduct ? $idProduct : $this->input["id"];
         if (!$id)
             return $result;
 
-        if (CORE_VERSION == "5.3") {
-            $u = new DB('shop_price_group', 'spg');
-            $u->select('sg.id, sg.name');
-            $u->innerJoin('shop_group sg', 'sg.id = spg.id_group');
-            $u->where('spg.id_price = ? AND NOT spg.is_main', $id);
-        } else {
-            $u = new DB('shop_group_price', 'sgp');
-            $u->select('sg.id, sg.name');
-            $u->innerJoin('shop_group sg', 'sg.id = sgp.group_id');
-            $u->where('sgp.price_id = ?', $id);
-        }
+        $u = new DB('shop_product_group', 'spg');
+        $u->select('sgt.id_group id, sgt.name');
+        $u->innerJoin('shop_group_translate sgt', 'sgt.id_group = spg.id_group');
+        $u->where('spg.id_product = ?', $id);
         return $u->getList();
     }
 
-    public function getModifications($idProduct = null)
+    private function getParamsByStr($params)
+    {
+        $result = array();
+        $items = explode("\n", $params);
+        foreach ($items as $item) {
+            $param = array();
+            $values = explode("\t", $item);
+            $param["idFeature"] = $values[0];
+            $param["name"] = $values[1];
+            $param["idValue"] = $values[2];
+            $param["value"] = $values[3];
+            $result[] = $param;
+        }
+        return $result;
+    }
+
+    public function getOffers($idProduct = null)
     {
         $result = array();
         $id = $idProduct ? $idProduct : $this->input["id"];
         if (!$id)
             return $result;
 
-        $newTypes = array("string" => "S", "number" => "D", "bool" => "B", "list" => "L", "colorlist" => "CL");
-        $product = array();
-
-        $u = new DB('shop_modifications', 'sm');
-        $u->select('smg.*,
-                GROUP_CONCAT(DISTINCT(CONCAT_WS("\t", sf.id, sf.name, sf.`type`, sf.sort)) SEPARATOR "\n") `columns`');
-        $u->innerJoin('shop_modifications_group smg', 'smg.id = sm.id_mod_group');
-        $u->innerJoin('shop_modifications_feature smf', 'smf.id_modification = sm.id');
-        $u->innerJoin('shop_feature sf', 'sf.id = smf.id_feature');
-        $u->where('sm.id_price = ?', $id);
-        $u->groupBy('smg.id');
-        $u->orderBy('smg.sort');
-        $objects = $u->getList();
-        $isDefModification = false;
-        if (empty($objects)) {
-            $idGroup = $this->result["idModificationGroupDef"];
-            if (empty($idGroup))
-                return $result;
-
-            $isDefModification = true;
-            $u = new DB('shop_modifications_group', 'smg');
-            $u->select('smg.*,
-                GROUP_CONCAT(DISTINCT(CONCAT_WS("\t", sf.id, sf.name, sf.`type`, sf.sort)) SEPARATOR "\n") `columns`');
-            $u->innerJoin('shop_group_feature sgf', 'smg.id = sgf.id_group');
-            $u->innerJoin('shop_feature sf', 'sf.id = sgf.id_feature');
-            $u->where('smg.id = ?', $idGroup);
-            $u->groupBy('smg.id');
-            $u->orderBy('smg.sort');
-            $objects = $u->getList();
+        $u = new DB('shop_offer', 'so');
+        $u->select('so.*, sop.value price, 
+            GROUP_CONCAT(CONCAT_WS("\t", sof.id_feature, sft.name, sfv.id, sfv.value) SEPARATOR "\n") params');
+        $u->leftJoin('shop_offer_price sop', "sop.id_offer = so.id AND sop.id_typeprice = {$this->idTypePrice}");
+        $u->leftJoin('shop_offer_feature sof', 'sof.id_offer = so.id');
+        $u->leftJoin('shop_feature_translate sft', 'sft.id_feature = sof.id_feature');
+        $u->leftJoin('shop_feature_value sfv', 'sfv.id = sof.id_value');
+        $u->where('so.id_product = ?', $id);
+        $u->groupBy('so.id');
+        $list = $u->getList();
+        foreach ($list as $value) {
+            $value["params"] = $this->getParamsByStr($value["params"]);
+            $result[] = $value;
         }
-        foreach ($objects as $item) {
-            $group = null;
-            $group['id'] = $item['id'];
-            $group['name'] = $item['name'];
-            $group['sortIndex'] = $item['sort'];
-            $group['type'] = $item['vtype'];
-            if (!$product["idGroupModification"]) {
-                $product["idGroupModification"] = $group['id'];
-                $product["nameGroupModification"] = $group['name'];
-            }
-            $items = explode("\n", $item['columns']);
-            foreach ($items as $item) {
-                $item = explode("\t", $item);
-                $column['id'] = $item[0];
-                $column['name'] = $item[1];
-                $column['type'] = $item[2];
-                $column['sortIndex'] = $item[3];
-                $column['valueType'] = $newTypes[$column['type']];
-                $group['columns'][] = $column;
-            }
-            $group['items'] = array();
-            $groups[] = $group;
-        }
-        if (!isset($groups))
-            return $result;
-        if ($isDefModification)
-            return $groups;
 
-        $u = new DB('shop_modifications', 'sm');
-        $u->select('sm.*,
-                SUBSTRING(GROUP_CONCAT(DISTINCT(CONCAT_WS("\t", sfvl.id_feature, sfvl.id, sfvl.value, sfvl.sort, sfvl.color)) SEPARATOR "\n"), 1) values_feature,
-                SUBSTRING(GROUP_CONCAT(DISTINCT(CONCAT_WS("\t", smi.id_img, smi.sort, si.picture)) SEPARATOR "\n"), 1) images');
-        $u->innerJoin('shop_modifications_feature smf', 'sm.id = smf.id_modification');
-        $u->innerJoin('shop_feature_value_list sfvl', 'sfvl.id = smf.id_value');
-        $u->leftJoin('shop_modifications_img smi', 'sm.id = smi.id_modification');
-        $u->leftJoin('shop_img si', 'smi.id_img = si.id');
-        $u->where('sm.id_price = ?', $id);
-        $u->groupBy();
-        $objects = $u->getList();
-        $existFeatures = array();
-        foreach ($objects as $item) {
-            if ($item['id']) {
-                $modification = null;
-                $modification['id'] = $item['id'];
-                $modification['article'] = $item['code'];
-                if ($item['count'] != null)
-                    $modification['count'] = (real)$item['count'];
-                else $modification['count'] = -1;
-                if (!$modification['article'])
-                    $modification['article'] = $product["article"];
-                if (!$modification['measurement'])
-                    $modification['measurement'] = $product['measurement'];
-                $modification['price'] = (real)$item['value'];
-                $modification['priceSmallOpt'] = (real)$item['valueOpt'];
-                $modification['priceOpt'] = (real)$item['valueOptCorp'];
-                $modification['description'] = $item['description'];
-                $features = explode("\n", $item['valuesFeature']);
-                $sorts = array();
-                foreach ($features as $feature) {
-                    $feature = explode("\t", $feature);
-                    $value = null;
-                    $value['idFeature'] = $feature[0];
-                    $value['id'] = $feature[1];
-                    $value['value'] = $feature[2];
-                    $sorts[] = $feature[3];
-                    $value['color'] = $feature[4];
-                    $modification['values'][] = $value;
-                }
-                $modification['sortValue'] = $sorts;
-                if ($item['images']) {
-                    $images = explode("\n", $item['images']);
-                    foreach ($images as $image) {
-                        $feature = explode("\t", $image);
-                        $value = null;
-                        $value['id'] = $feature[0];
-                        $value['sortIndex'] = $feature[1];
-                        $value['imageFile'] = $feature[2];
-                        if ($value['imageFile']) {
-                            if (strpos($value['imageFile'], "://") === false) {
-                                $value['imageUrl'] = 'http://' . HOSTNAME . "/images/rus/shopprice/" . $value['imageFile'];
-                                $value['imageUrlPreview'] = "http://" . HOSTNAME . "/lib/image.php?size=64&img=images/rus/shopprice/" . $value['imageFile'];
-                            } else {
-                                $value['imageUrl'] = $image['imageFile'];
-                                $value['imageUrlPreview'] = $image['imageFile'];
-                            }
-                        }
-                        $modification['images'][] = $value;
-                    }
-                }
-                foreach ($groups as &$group) {
-                    if ($group['id'] == $item['idModGroup']) {
-                        $group['items'][] = $modification;
-                    }
-                }
-                $existFeatures[] = $item['valuesFeature'];
-            }
-        }
-        return $groups;
+        return $result;
     }
 
     public function getDiscounts($idProduct = null)
@@ -384,15 +305,16 @@ class Product extends Base
 
     protected function getAddInfo()
     {
+        $result = array();
+        $result["groups"] = $this->getGroups();
         $result["images"] = $this->getImages();
+        $result["offers"] = $this->getOffers();
         $result["specifications"] = $this->getSpecifications();
-        $result["similarProducts"] = $this->getSimilarProducts();
-        $result["accompanyingProducts"] = $this->getAccompanyingProducts();
-        $result["comments"] = $this->getComments();
-        $result["reviews"] = $this->getReviews();
-        $result["discounts"] = $this->getDiscounts();
-        $result["crossGroups"] = $this->getCrossGroups();
-        $result["modifications"] = $this->getModifications();
+//        $result["similarProducts"] = $this->getSimilarProducts();
+//        $result["accompanyingProducts"] = $this->getAccompanyingProducts();
+//        $result["comments"] = $this->getComments();
+//        $result["reviews"] = $this->getReviews();
+//        $result["discounts"] = $this->getDiscounts();
         return $result;
     }
 

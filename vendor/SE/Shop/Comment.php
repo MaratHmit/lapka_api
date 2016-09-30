@@ -4,18 +4,18 @@ namespace SE\Shop;
 
 class Comment extends Base
 {
-    protected $tableName = "shop_comm";
+    protected $tableName = "shop_commentary";
 
     protected function getSettingsFetch()
     {
-        return array(
-            "select" => 'sc.*, sp.id id_product, sp.name name_product',
-            "joins" => array(
+        return [
+            "select" => 'sc.*, spt.name name_product, sc.created_at `date`',
+            "joins" => [
                 "type" => "inner",
-                "table" => 'shop_price sp',
-                "condition" => 'sp.id = sc.id_price'
-            )
-        );
+                "table" => 'shop_product_translate spt',
+                "condition" => 'spt.id_product = sc.id_product'
+            ]
+        ];
     }
 
     protected function getSettingsInfo()
@@ -26,9 +26,9 @@ class Comment extends Base
     public function fetchByIdProduct($idProduct)
     {
         if (!$idProduct)
-            return array();
+            return [];
 
-        $this->setFilters(array("field" => "idPrice", "value" => $idProduct));
+        $this->setFilters(["field" => "idProduct", "value" => $idProduct]);
         return $this->fetch();
     }
 }

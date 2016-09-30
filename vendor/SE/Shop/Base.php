@@ -58,6 +58,12 @@ class Base
             foreach ($worlds as $world)
                 $this->tableAlias .= $world[0];
         }
+        $this->init();
+    }
+
+    protected function init()
+    {
+
     }
 
     function __set($name, $value)

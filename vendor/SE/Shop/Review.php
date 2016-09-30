@@ -4,23 +4,22 @@ namespace SE\Shop;
 
 class Review extends Base
 {
-    protected $tableName = "shop_reviews";
+    protected $tableName = "shop_review";
 
     protected function getSettingsFetch()
     {
         return array(
-            "select" => 'sr.*, (sr.active = "Y") is_active,
-                 CONCAT_WS(" ", p.last_name, p.first_name, p.sec_name) name_user, sp.name name_product',
+            "select" => 'sr.*, sp_tr.name name_product, u.name name_user',
             "joins" => array(
                 array(
                     "type" => "inner",
-                    "table" => 'person p',
-                    "condition" => 'p.id = sr.id_user'
+                    "table" => 'user u',
+                    "condition" => 'u.id = sr.id_user'
                 ),
                 array(
                     "type" => "inner",
-                    "table" => 'shop_price sp',
-                    "condition" => 'sp.id = sr.id_price'
+                    "table" => 'shop_product_translate sp_tr',
+                    "condition" => 'sp_tr.id_product = sr.id_product'
                 )
             )
         );
@@ -36,7 +35,7 @@ class Review extends Base
         if (!$idProduct)
             return array();
 
-        $this->setFilters(array("field" => "idPrice", "value" => $idProduct));
+        $this->setFilters(array("field" => "idProduct", "value" => $idProduct));
         return $this->fetch();
     }
 
