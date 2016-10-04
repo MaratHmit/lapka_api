@@ -40,7 +40,7 @@ class ProductType extends Base
 
         try {
             DB::saveManyToMany($this->input["id"], $this->input["features"],
-                array("table" => "shop_product_type_feature", "key" => "id_type", "link" => "id_feature"));
+                array("table" => "shop_type_feature", "key" => "id_type", "link" => "id_feature"));
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить параметры типа!";

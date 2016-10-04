@@ -94,7 +94,7 @@ class Product extends Base
     protected function getSettingsInfo()
     {
         return [
-            "select" => 'sp.*, tr.name name',
+            "select" => 'sp.*, tr.name name, st.name name_type',
             "joins" => [
                 [
                     "type" => "left",
@@ -110,6 +110,11 @@ class Product extends Base
                     "type" => "inner",
                     "table" => 'shop_offer so',
                     "condition" => "so.id_product = sp.id"
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_type st',
+                    "condition" => 'st.id = sp.id_type'
                 ]
             ]
         ];
@@ -157,9 +162,9 @@ class Product extends Base
             $result = array();
             foreach ($items as $item) {
                 if ($item["type"] == "number")
-                    $item["value"] = (real) $item["value"];
+                    $item["value"] = (real)$item["value"];
                 elseif ($item["type"] == "bool")
-                    $item["value"] = (bool) $item["value"];
+                    $item["value"] = (bool)$item["value"];
                 $result[] = $item;
             }
             return $result;
@@ -272,6 +277,7 @@ class Product extends Base
 
         $u = new DB('shop_offer', 'so');
         $u->select('so.*, sop.value price, 
+            (SELECT SUM(sfs.value) FROM shop_warehouse_stock sfs WHERE sfs.id_offer = so.id GROUP BY sfs.id_offer) count,
             GROUP_CONCAT(CONCAT_WS("\t", sof.id_feature, sft.name, sfv.id, sfv.value) SEPARATOR "\n") params');
         $u->leftJoin('shop_offer_price sop', "sop.id_offer = so.id AND sop.id_typeprice = {$this->idTypePrice}");
         $u->leftJoin('shop_offer_feature sof', 'sof.id_offer = so.id');
@@ -788,28 +794,27 @@ class Product extends Base
         }
     }
 
-    private function saveIdGroup()
+    private function saveGroups()
     {
-        if (CORE_VERSION != "5.3" || !isset($this->input["idGroup"]))
+        if (!isset($this->input["groups"]))
             return true;
 
         try {
             $idsProducts = $this->input["ids"];
-            $idGroup = $this->input["idGroup"];
+            $groups = $this->input["groups"];
             $idsStr = implode(",", $idsProducts);
-            $u = new DB('shop_price_group');
-            $u->where('is_main AND id_price IN (?)', $idsStr)->deleteList();
-            foreach ($idsProducts as $idProduct) {
-                $group["idPrice"] = $idProduct;
-                $group["idGroup"] = $idGroup;
-                $group["isMain"] = true;
-                $u = new DB('shop_price_group');
-                $u->setValuesFields($group);
-                $u->save();
+            $u = new DB('shop_product_group', 'spg');
+            $u->where('id_product in (?)', $idsStr)->deleteList();
+            $i = 0;
+            foreach ($groups as $group)
+                foreach ($idsProducts as $idProduct)
+                    $data[] = array('id_product' => $idProduct, 'id_group' => $group["id"], 'is_main' => !$i++);
+            if (!empty($data)) {
+                DB::insertList('shop_product_group', $data);
             }
             return true;
         } catch (Exception $e) {
-            $this->error = "Не удаётся сохранить категорию товара!";
+            $this->error = "Не удаётся сохранить категории товара!";
             throw new Exception($this->error);
         }
     }
@@ -819,9 +824,7 @@ class Product extends Base
         if (!$this->input["ids"])
             return false;
 
-        return $this->saveImages() && $this->saveSpecifications() && $this->saveSimilarProducts() &&
-        $this->saveAccompanyingProducts() && $this->saveComments() && $this->saveReviews() &&
-        $this->saveCrossGroups() && $this->saveDiscounts() && $this->saveModifications() && $this->saveIdGroup();
+        return $this->saveGroups();
     }
 
     private function getGroup($groups, $idGroup)
