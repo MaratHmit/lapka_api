@@ -362,7 +362,7 @@ class Base
     protected function getSettingsFetch()
     {
         $result = [];
-        $select = [];
+        $select = ["{$this->tableAlias}.*"];
         $joins = [];
         if ($translate = $this->getSettingsFetchTranslate()) {
             $select[] = $translate["select"];
@@ -389,11 +389,11 @@ class Base
             $columns = $t->getColumns();
             $linkName = $columns[1];
             $selectFields = [];
-            for ($i = 3; $i < count($columns) - 2; ++$i)
+            for ($i = 3; $i < count($columns); ++$i)
                 $selectFields[] = "{$alias}.$columns[$i] $columns[$i]";
             $selectFields = implode(", ", $selectFields);
             return [
-                "select" => "{$this->tableAlias}.*, {$selectFields}",
+                "select" => "{$selectFields}",
                 "joins" => [
                     [
                         "type" => "left",

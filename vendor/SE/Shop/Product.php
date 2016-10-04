@@ -94,7 +94,10 @@ class Product extends Base
     protected function getSettingsInfo()
     {
         return [
-            "select" => 'sp.*, tr.name name, st.name name_type',
+            "select" => 'sp.*, 
+                tr.name name, tr.content, tr.description, tr.available_info,
+                tr.meta_title, tr.meta_keywords, tr.meta_description,   
+                sbt.name name_brand, st.name name_type, smt.name name_measure',
             "joins" => [
                 [
                     "type" => "left",
@@ -115,7 +118,12 @@ class Product extends Base
                     "type" => "left",
                     "table" => 'shop_type st',
                     "condition" => 'st.id = sp.id_type'
-                ]
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_measure_translate smt',
+                    "condition" => 'smt.id_measure = sp.id_measure'
+                ],
             ]
         ];
     }
@@ -180,26 +188,11 @@ class Product extends Base
         if (!$id)
             return $result;
 
-        $u = new DB('shop_sameprice', 'ss');
-        $u->select('sp1.id id1, sp1.name name1, sp1.code code1, sp1.article article1, sp1.price price1,
-                    sp2.id id2, sp2.name name2, sp2.code code2, sp2.article article2, sp2.price price2');
-        $u->innerJoin('shop_price sp1', 'sp1.id = ss.id_price');
-        $u->innerJoin('shop_price sp2', 'sp2.id = ss.id_acc');
-        $u->where('sp1.id = ? OR sp2.id = ?', $id);
-        $objects = $u->getList();
-        foreach ($objects as $item) {
-            $similar = null;
-            $i = 1;
-            if ($item['id1'] == $id)
-                $i = 2;
-            $similar['id'] = $item['id' . $i];
-            $similar['name'] = $item['name' . $i];
-            $similar['code'] = $item['code' . $i];
-            $similar['article'] = $item['article' . $i];
-            $similar['price'] = (real)$item['price' . $i];
-            $result[] = $similar;
-        }
-        return $result;
+        $u = new DB('shop_product_translate', 'spt');
+        $u->select('spt.id_product id, spt.name');
+        $u->innerJoin('shop_product_related spr', 'spt.id_product = spr.id_product OR spt.id_product = spr.id_related');
+        $u->where('`type` = 2');
+        return $u->getList();
     }
 
     public function getAccompanyingProducts($idProduct = null)
@@ -209,21 +202,11 @@ class Product extends Base
         if (!$id)
             return $result;
 
-        $u = new DB('shop_accomp', 'sa');
-        $u->select('sp.id, sp.name, sp.code, sp.article, sp.price');
-        $u->innerJoin('shop_price sp', 'sp.id = sa.id_acc');
-        $u->where('sa.id_price = ?', $id);
-        $objects = $u->getList();
-        foreach ($objects as $item) {
-            $accompanying = null;
-            $accompanying['id'] = $item['id'];
-            $accompanying['name'] = $item['name'];
-            $accompanying['code'] = $item['code'];
-            $accompanying['article'] = $item['article'];
-            $accompanying['price'] = (real)$item['price'];
-            $result[] = $accompanying;
-        }
-        return $result;
+        $u = new DB('shop_product_translate', 'spt');
+        $u->select('spt.id_product id, spt.name');
+        $u->innerJoin('shop_product_related spr', 'spt.id_product = spr.id_product');
+        $u->where('`type` = 1');
+        return $u->getList();
     }
 
     public function getComments($idProduct = null)
@@ -316,11 +299,13 @@ class Product extends Base
         $result["images"] = $this->getImages();
         $result["offers"] = $this->getOffers();
         $result["specifications"] = $this->getSpecifications();
-//        $result["similarProducts"] = $this->getSimilarProducts();
-//        $result["accompanyingProducts"] = $this->getAccompanyingProducts();
-//        $result["comments"] = $this->getComments();
-//        $result["reviews"] = $this->getReviews();
+        $result["similarProducts"] = $this->getSimilarProducts();
+        $result["accompanyingProducts"] = $this->getAccompanyingProducts();
+        $result["comments"] = $this->getComments();
+        $result["reviews"] = $this->getReviews();
 //        $result["discounts"] = $this->getDiscounts();
+        $result["measures"] = (new Measure())->fetch();
+        $result["productTypes"] = (new ProductType())->fetch();
         return $result;
     }
 

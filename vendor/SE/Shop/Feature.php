@@ -52,7 +52,7 @@ class Feature extends Base
 
     protected function getAddInfo()
     {
-        $result["measure"] = (new Measure())->fetch();
+        $result["measures"] = (new Measure())->fetch();
         $result["values"] = $this->getValues();
         return $result;
     }

@@ -13,6 +13,7 @@ class ProductType extends Base
 
         try {
             $id = $this->input["id"];
+            $result = [];
 
             $u = new DB('shop_type_feature', 'stf');
             $u->select("stf.id_feature id, tr.name, sf.type, sf.sort, sm_tr.name measure");
@@ -21,10 +22,20 @@ class ProductType extends Base
             $u->leftJoin('shop_measure_translate sm_tr', 'sm_tr.id_measure = sf.id_measure');
             $u->groupBy("sf.id");
             $u->where('stf.id_type = ?', $id);
-            return $u->getList();
+            $items = $u->getList();
+            foreach ($items as $item) {
+                $item["values"] = $this->getValuesByIdFeature($item["id"]);
+                $result[] = $item;
+            }
+            return $result;
         } catch (Exception $e) {
             $this->error = "Не удаётся получить список параметров типа!";
         }
+    }
+
+    private function getValuesByIdFeature($idFeature)
+    {
+        return (new FeatureValue())->fetchByIdFeature($idFeature);
     }
 
     protected function getAddInfo()
