@@ -371,7 +371,7 @@ class Category extends Base
             return false;
 
         $this->saveDiscounts();
-        $this->saveImages();
+        $this->saveListImages();
         $this->saveChilds();
 
         $group = (new Category($this->input))->info();

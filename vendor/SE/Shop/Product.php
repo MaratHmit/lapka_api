@@ -47,7 +47,7 @@ class Product extends Base
                     "condition" => 'sbt.id_brand = sp.id_brand'
                 ],
                 [
-                    "type" => "inner",
+                    "type" => "left",
                     "table" => 'shop_offer so',
                     "condition" => "so.id_product = sp.id"
                 ],
@@ -110,7 +110,7 @@ class Product extends Base
                     "condition" => 'sbt.id_brand = sp.id_brand'
                 ],
                 [
-                    "type" => "inner",
+                    "type" => "left",
                     "table" => 'shop_offer so',
                     "condition" => "so.id_product = sp.id"
                 ],
@@ -229,7 +229,7 @@ class Product extends Base
             return $result;
 
         $u = new DB('shop_product_group', 'spg');
-        $u->select('sgt.id_group id, sgt.name');
+        $u->select('spg.id id_key, sgt.id_group id, sgt.name, spg.is_main');
         $u->innerJoin('shop_group_translate sgt', 'sgt.id_group = spg.id_group');
         $u->where('spg.id_product = ?', $id);
         return $u->getList();
@@ -307,74 +307,6 @@ class Product extends Base
         $result["measures"] = (new Measure())->fetch();
         $result["productTypes"] = (new ProductType())->fetch();
         return $result;
-    }
-
-    protected function correctValuesBeforeSave()
-    {
-        if (!$this->input["id"] && !$this->input["ids"] || isset($this->input["code"])) {
-            if (empty($this->input["code"]))
-                $this->input["code"] = strtolower(se_translite_url($this->input["name"]));
-            $this->input["code"] = $this->getUrl($this->input["code"], $this->input["id"]);
-        }
-    }
-
-    private function saveImages()
-    {
-        if (!isset($this->input["images"]))
-            return true;
-
-        try {
-            $idsProducts = $this->input["ids"];
-            $images = $this->input["images"];
-            if ($this->isNew) {
-                foreach ($images as &$image)
-                    unset($image["id"]);
-                unset($image);
-            }
-            // обновление изображений
-            $idsStore = "";
-
-            foreach ($images as $image) {
-                if ($image["id"] > 0) {
-                    if (!empty($idsStore))
-                        $idsStore .= ",";
-                    $idsStore .= $image["id"];
-                    $u = new DB('shop_img', 'si');
-                    $image["picture"] = $image["imageFile"];
-                    $image["sort"] = $image["sortIndex"];
-                    $image["pictureAlt"] = $image["imageAlt"];
-                    $image["default"] = $image["isMain"];
-                    $u->setValuesFields($image);
-                    $u->save();
-                }
-            }
-            $idsStr = implode(",", $idsProducts);
-            if (!empty($idsStore)) {
-                $u = new DB('shop_img', 'si');
-                $u->where("id_price IN ($idsStr) AND NOT (id IN (?))", $idsStore)->deleteList();
-            } else {
-                $u = new DB('shop_img', 'si');
-                $u->where('id_price IN (?)', $idsStr)->deleteList();
-            }
-
-            $data = array();
-            foreach ($images as $image)
-                if (empty($image["id"]) || ($image["id"] <= 0)) {
-                    foreach ($idsProducts as $idProduct) {
-                        $data[] = array('id_price' => $idProduct, 'picture' => $image["imageFile"],
-                            'sort' => (int)$image["sortIndex"], 'picture_alt' => $image["imageAlt"],
-                            'default' => (int)$image["isMain"]);
-                        $newImages[] = $image["imageFile"];
-                    }
-                }
-
-            if (!empty($data))
-                DB::insertList('shop_img', $data);
-            return true;
-        } catch (Exception $e) {
-            $this->error = "Не удаётся сохранить изображения товара!";
-            throw new Exception($this->error);
-        }
     }
 
     private function getIdSpecificationGroup($name)
@@ -788,14 +720,38 @@ class Product extends Base
             $idsProducts = $this->input["ids"];
             $groups = $this->input["groups"];
             $idsStr = implode(",", $idsProducts);
-            $u = new DB('shop_product_group', 'spg');
-            $u->where('id_product in (?)', $idsStr)->deleteList();
+            $idsGroups = [];
             $i = 0;
-            foreach ($groups as $group)
-                foreach ($idsProducts as $idProduct)
-                    $data[] = array('id_product' => $idProduct, 'id_group' => $group["id"], 'is_main' => !$i++);
-            if (!empty($data)) {
+            foreach ($groups as $group) {
+                $idsGroups[] = $group["id"];
+                if (!$group["idKey"])
+                    foreach ($idsProducts as $idProduct)
+                        $data[] = array('id_product' => $idProduct, 'id_group' => $group["id"], 'is_main' => !$i);
+                $i++;
+            }
+            $idsGroupsStr = implode(",", $idsGroups);
+            $u = new DB('shop_product_group', 'spg');
+            $u->where('id_product IN (?)', $idsStr);
+            if ($idsGroups)
+                $u->andWhere("NOT id_group IN (?)", $idsGroupsStr);
+            $u->deleteList();
+            if (!empty($data))
                 DB::insertList('shop_product_group', $data);
+            foreach ($idsProducts as $idProduct) {
+                $i = 0;
+                foreach ($groups as $group) {
+                    if ($group["idKey"]) {
+                        $data = [];
+                        $data["idGroup"] = $group["id"];
+                        $data["id"] = $group["idKey"];
+                        $data["idProduct"] = $idProduct;
+                        $data["isMain"] = !$i;
+                        $u = new DB('shop_product_group', 'spg');
+                        $u->setValuesFields($data);
+                        $u->save();
+                    }
+                    $i++;
+                }
             }
             return true;
         } catch (Exception $e) {
@@ -804,12 +760,32 @@ class Product extends Base
         }
     }
 
+    private function createDefaultOffer()
+    {
+        if (!$this->isNew)
+            return true;
+
+        $idType = !empty($this->input["idType"]) ? $this->input["idType"] : null;
+        if (!empty($this->input["idGroup"]) && empty($idType)) {
+
+        }
+
+        $idsProducts = $this->input["ids"];
+        foreach ($idsProducts as $idProduct) {
+            $offer = ["idProduct" => $idProduct];
+            $u = new DB('shop_offer', 'so');
+            $u->setValuesFields($offer);
+            $offer["idOffer"] = $u->save();
+        }
+        return true;
+    }
+
     protected function saveAddInfo()
     {
         if (!$this->input["ids"])
             return false;
 
-        return $this->saveGroups();
+        return $this->createDefaultOffer() && $this->saveListImages() && $this->saveGroups();
     }
 
     private function getGroup($groups, $idGroup)
