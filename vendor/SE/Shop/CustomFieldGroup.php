@@ -4,7 +4,7 @@ namespace SE\Shop;
 
 class CustomFieldGroup extends Base
 {
-    protected $tableName = "shop_userfield_groups";
+    protected $tableName = "shop_field_group";
     protected $sortBy = "sort";
     protected $sortOrder = "asc";    
     

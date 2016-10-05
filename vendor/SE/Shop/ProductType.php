@@ -16,7 +16,7 @@ class ProductType extends Base
             $result = [];
 
             $u = new DB('shop_type_feature', 'stf');
-            $u->select("stf.id_feature id, tr.name, sf.type, sf.sort, sm_tr.name measure");
+            $u->select("sf.target, stf.id_feature id, tr.name, sf.type, sf.sort, sm_tr.name measure");
             $u->innerJoin('shop_feature sf', 'sf.id = stf.id_feature');
             $u->leftJoin('shop_feature_translate tr', 'tr.id_feature = sf.id');
             $u->leftJoin('shop_measure_translate sm_tr', 'sm_tr.id_measure = sf.id_measure');

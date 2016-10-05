@@ -27,6 +27,14 @@ class Auth extends Base
         }
     }
 
+    private function getIdCurrency()
+    {
+        $u = new DB('shop_currency', 'sc');
+        $u->select("id");
+        $u->where("is_main");
+        return $u->fetchOne()["id"];
+    }
+
     public function info()
     {
         try {
@@ -45,6 +53,7 @@ class Auth extends Base
                 $_SESSION['isAuth'] = true;
                 $_SESSION['hostname'] = HOSTNAME;
                 $_SESSION['idLang'] = 1;
+                $_SESSION['idCurrency'] = $this->getIdCurrency();
 
                 $this->result = $data;
             } else {

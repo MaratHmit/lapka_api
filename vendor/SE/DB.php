@@ -47,7 +47,7 @@ class DB
 
     function __construct($tableName, $alias = null, $isCamelCaseMode = true)
     {
-        $this->tableName = $tableName;
+        $this->tableName = trim($tableName, "`");
         $this->aliasName = !empty($alias) ? $alias : $this->getAliasByTableName($tableName);
         $this->isCamelCaseMode = $isCamelCaseMode;
     }
@@ -462,8 +462,8 @@ class DB
         $result[] = "SELECT";
         $result[] = !empty($this->selectExpression) ? $this->selectExpression : "*";
         $result[] = "FROM";
-        $result[] = $this->tableName;
-        $result[] = $this->aliasName;
+        $result[] = "`{$this->tableName}`";
+        $result[] = "`{$this->aliasName}`";
         if ($this->joins) {
             foreach ($this->joins as $join) {
                 switch ($join["type"]) {
@@ -671,7 +671,7 @@ class DB
         $words = explode("_", $tableName);
         foreach ($words as $char)
             $result .= $char[0];
-        return "`{$result}`";
+        return $result;
     }
 
     public function convertFieldToModel($name)
