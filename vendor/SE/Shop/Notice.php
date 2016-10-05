@@ -3,6 +3,7 @@
 namespace SE\Shop;
 
 use SE\DB as DB;
+use SE\Exception as Exception;
 
 class Notice extends Base
 {
@@ -17,6 +18,11 @@ class Notice extends Base
     {
         if (isset($this->input["idTrigger"]) && empty($this->input["idTrigger"]))
             $this->input["idTrigger"] = null;
+    }
+
+    protected function saveAddInfo()
+    {
+        return $this->saveTriggers();
     }
 
     private function getTriggers()
@@ -35,5 +41,23 @@ class Notice extends Base
             $result[] = $trigger;
         }
         return $result;
+    }
+
+    private function saveTriggers()
+    {
+        $triggers = $this->input["triggers"];
+        $triggersNew = [];
+        foreach ($triggers as $trigger)
+            if ($trigger["isChecked"])
+                $triggersNew[] = $trigger;
+        try {
+            foreach ($this->input["ids"] as $id)
+                DB::saveManyToMany($id, $triggersNew,
+                    array("table" => "notice_trigger", "key" => "id_notice", "link" => "id_trigger"));
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удаётся сохранить триггеры уведомления!";
+            throw new Exception($this->error);
+        }
     }
 }
