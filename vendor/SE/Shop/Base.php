@@ -311,6 +311,78 @@ class Base
         }
         return $result["id"];
     }
+    
+    public function saveListImages($tableImages = null, $fieldLinkName = null)
+    {
+        $tableImages = empty($tableName) ? $this->tableName . "_image" : $tableImages;
+        if (!DB::existTable($tableImages))
+            return false;
+        
+        try {
+            if (empty($fieldLinkName)) {
+                $t = new DB("{$tableImages}");
+                $fieldLinkName = $t->getColumns()[1];
+            }
+            $idsItems = $this->input["ids"];
+            $images = $this->input["images"];
+            $idsStore = "";
+            foreach ($images as $image) {
+                if ($image["id"]) {
+                    if (!empty($idsStore))
+                        $idsStore .= ",";
+                    $idsStore .= $image["id"];
+                    $u = new DB("{$tableImages}", 'si');
+                    $u->setValuesFields($image);
+                    $u->save();
+                }
+                if ($image["idImage"]) {
+                    if ($image["idTranslate"])
+                        $data["id"] = $image["idTranslate"];
+                    else {
+                        $data["idImage"] = $image["idImage"];
+                        $data["idLang"] = $this->idLang;
+                    }
+                    $data["alt"] = $image["alt"];
+                    $data["title"] = $image['title'];
+                    $u = new DB('image_translate');
+                    $u->setValuesFields($data);
+                    $u->save();
+                }
+            }
+
+            $idsStr = implode(",", $idsItems);
+            if (!empty($idsStore)) {
+                $u = new DB("{$tableImages}", 'sgi');
+                $u->where("{$fieldLinkName} IN ($idsStr) AND NOT (id IN (?))", $idsStore)->deleteList();
+            } else {
+                $u = new DB("{$tableImages}", 'sgi');
+                $u->where("{$fieldLinkName} IN (?)", $idsStr)->deleteList();
+            }
+
+            $data = [];
+            $i = 0;
+            foreach ($images as $image)
+                if (empty($image["id"])) {
+                    foreach ($idsItems as $idItem) {
+                        if ($idImage = $this->saveImage($image["imagePath"]))
+                            $data[] = ["{$fieldLinkName}" => $idItem, 'id_image' => $idImage, 'sort' => (int)$image["sort"],
+                                'is_main' => isset($image["isMain"]) ? (bool) $image["isMain"] : !$i++];
+                        $dataTranslate[] = ['id_image' => $idImage, 'id_lang' => $this->idLang,
+                            'title' => $image["title"], 'alt' => $image["alt"]];
+                    }
+                }
+
+            if (!empty($data))
+                DB::insertList("{$tableImages}", $data);
+            if (!empty($dataTranslate))
+                DB::insertList('image_translate', $dataTranslate);
+
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удаётся сохранить изображения!";
+            throw new Exception($this->error);
+        }
+    }
 
     public function sort()
     {
