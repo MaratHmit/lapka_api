@@ -34,7 +34,7 @@ class Product extends Base
         return [
             "select" => 'sp.*, tr.name name, so.article article,
                 sop.value price, sbt.name name_brand, sgt.name name_group,
-                CONCAT(f.name, "/", img.name) image_path',
+                CONCAT(f.name, "/", img.name) image_path, spg.id_group id_group',
             "joins" => [
                 [
                     "type" => "left",

@@ -315,8 +315,9 @@ class Base
     public function saveListImages($tableImages = null, $fieldLinkName = null)
     {
         $tableImages = empty($tableName) ? $this->tableName . "_image" : $tableImages;
-        if (!DB::existTable($tableImages))
-            return false;
+        $images = $this->input["images"];
+        if (!isset($images) || !DB::existTable($tableImages))
+            return true;
         
         try {
             if (empty($fieldLinkName)) {
@@ -324,7 +325,6 @@ class Base
                 $fieldLinkName = $t->getColumns()[1];
             }
             $idsItems = $this->input["ids"];
-            $images = $this->input["images"];
             $idsStore = "";
             foreach ($images as $image) {
                 if ($image["id"]) {

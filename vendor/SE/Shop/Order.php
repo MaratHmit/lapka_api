@@ -47,54 +47,27 @@ class Order extends Base
 
     protected function getSettingsFetch()
     {
-        return array(
-            "select" => 'so.*, IFNULL(c.name, CONCAT_WS(" ", p.last_name, p.first_name, p.sec_name)) customer, 
-                IFNULL(c.phone, p.phone) customer_phone, IFNULL(c.email, p.email) customer_email, 
-                (SUM((sto.price-IFNULL(sto.discount, 0))*sto.count)-IFNULL(so.discount, 0) + IFNULL(so.delivery_payee, 0)) amount, 
-                sp.name_payment name_payment_primary, spp.name_payment, sch.id_coupon id_coupon, sch.discount coupon_discount',
-            "joins" => array(
-                array(
+        return [
+            "select" => 'so.*, u.name customer, u.phone customer_phone, u.email customer_email, 
+                SUM((soi.price - soi.discount) * soi.count - so.discount) amount',
+            "joins" => [
+                [
                     "type" => "left",
-                    "table" => 'person p',
-                    "condition" => 'p.id = so.id_author'
-                ),
-                array(
-                    "type" => "left",
-                    "table" => 'company c',
-                    "condition" => 'c.id = so.id_company'
-                ),
-                array(
+                    "table" => 'user u',
+                    "condition" => 'u.id = so.id_user'
+                ],
+                [
                     "type" => "inner",
-                    "table" => 'shop_tovarorder sto',
-                    "condition" => 'sto.id_order = so.id'
-                ),
-                array(
-                    "type" => "left",
-                    "table" => 'shop_order_payee sop',
-                    "condition" => 'sop.id_order = so.id'
-                ),
-                array(
-                    "type" => "left",
-                    "table" => 'shop_payment spp',
-                    "condition" => 'spp.id = sop.payment_type'
-                ),
-                array(
-                    "type" => "left",
-                    "table" => 'shop_payment sp',
-                    "condition" => 'sp.id = so.payment_type'
-                ),
-                array(
-                    "type" => "left",
-                    "table" => 'shop_coupons_history sch',
-                    "condition" => 'sch.id_order = so.id'
-                )
-            ),
-            "aggregation" => array(
+                    "table" => 'shop_order_item soi',
+                    "condition" => 'soi.id_order = so.id'
+                ]
+            ],
+            "aggregation" => [
                 "type" => "SUM",
                 "field" => "amount",
                 "name" => "totalAmount"
-            )
-        );
+            ]
+        ];
     }
 
     protected function getSettingsInfo()

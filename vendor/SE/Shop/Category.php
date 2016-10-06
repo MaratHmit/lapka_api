@@ -240,68 +240,6 @@ class Category extends Base
         }
     }
 
-    private function saveImages()
-    {
-        try {
-            $idsGroups = $this->input["ids"];
-            $images = $this->input["images"];
-            $idsStore = "";
-            foreach ($images as $image) {
-                if ($image["id"]) {
-                    if (!empty($idsStore))
-                        $idsStore .= ",";
-                    $idsStore .= $image["id"];
-                    $u = new DB('shop_group_image', 'si');
-                    $u->setValuesFields($image);
-                    $u->save();
-                }
-                if ($image["idImage"]) {
-                    if ($image["idTranslate"])
-                        $data["id"] = $image["idTranslate"];
-                    else {
-                        $data["idImage"] = $image["idImage"];
-                        $data["idLang"] = $this->idLang;
-                    }
-                    $data["alt"] = $image["alt"];
-                    $data["title"] = $image['title'];
-                    $u = new DB('image_translate');
-                    $u->setValuesFields($data);
-                    $u->save();
-                }
-            }
-
-            $idsStr = implode(",", $idsGroups);
-            if (!empty($idsStore)) {
-                $u = new DB('shop_group_image', 'sgi');
-                $u->where("id_group IN ($idsStr) AND NOT (id IN (?))", $idsStore)->deleteList();
-            } else {
-                $u = new DB('shop_group_image', 'sgi');
-                $u->where('id_group IN (?)', $idsStr)->deleteList();
-            }
-
-            $data = [];
-            $i = 0;
-            foreach ($images as $image)
-                if (empty($image["id"])) {
-                    foreach ($idsGroups as $idGroup) {
-                        if ($idImage = $this->saveImage($image["imagePath"]))
-                            $data[] = ['id_group' => $idGroup, 'id_image' => $idImage, 'sort' => (int)$image["sort"],
-                                'is_main' => !$i++];
-                            $dataTranslate[] = ['id_image' => $idImage, 'id_lang' => $this->idLang,
-                                'title' => $image["title"], 'alt' => $image["alt"]];
-                    }
-                }
-
-            if (!empty($data))
-                DB::insertList('shop_group_image', $data);
-            if (!empty($dataTranslate))
-                DB::insertList('image_translate', $dataTranslate);
-        } catch (Exception $e) {
-            $this->error = "Не удаётся сохранить изображения категории товара!";
-            throw new Exception($this->error);
-        }
-    }
-
     static public function getLevel($id)
     {
         $level = 0;
