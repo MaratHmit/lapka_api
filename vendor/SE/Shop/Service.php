@@ -14,7 +14,6 @@ class Service extends Base
 
     protected function getAddInfo()
     {
-        $this->testTelegram();
         return ["parameters" => $this->getParameters()];
     }
 

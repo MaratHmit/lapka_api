@@ -20,3 +20,7 @@ php_flag display_errors on
 php_flag html_errors on
 php_value docref_root 0
 php_value docref_ext 0
+
+# enable PHP error logging
+php_flag  log_errors on
+php_value error_log  /home/e/edgestile/lapka.e-stile.ru/public_html/api/PHP_errors.log
