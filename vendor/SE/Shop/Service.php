@@ -4,6 +4,7 @@ namespace SE\Shop;
 
 use SE\DB as DB;
 use SE\Exception as Exception;
+use TelegramBot\Api\BotApi as Telegram;
 
 class Service extends Base
 {
@@ -13,6 +14,7 @@ class Service extends Base
 
     protected function getAddInfo()
     {
+        $this->testTelegram();
         return ["parameters" => $this->getParameters()];
     }
 
@@ -43,6 +45,17 @@ class Service extends Base
             $this->error = "Не удается сохранить параметры!";
         }
         return false;
+    }
+
+    private function testTelegram()
+    {
+        $userId = '262003605';
+        $t = new DB('service_parameter', 'sp');
+        $t->select('sp.value');
+        $t->where('sp.code = "token" AND sp.id_service = ?', 3);
+        $token = $t->fetchOne()["value"];
+        $telegram = new Telegram($token);
+        $telegram->sendMessage($userId, "Тест");
     }
 
 }
