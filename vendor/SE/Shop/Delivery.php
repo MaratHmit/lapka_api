@@ -7,37 +7,7 @@ use SE\Exception;
 
 class Delivery extends Base
 {
-    protected $tableName = "shop_deliverytype";
-
-    public function fetch()
-    {
-        try {
-            $u = new DB('shop_deliverytype', 'sd');
-            $u->select('sd.*');
-            $u->where('sd.id_parent IS NULL');
-            $u->orderBy('sort', false);
-
-            $objects = $u->getList();
-            foreach ($objects as $item) {
-                $delivery = $item;
-                if (empty($delivery['code']))
-                    $delivery['code'] = "simple";
-                $delivery['period'] = $item['time'];
-                $delivery['idCityFrom'] = $item['cityFromDelivery'];
-                $delivery['isActive'] = ($item['status'] == 'Y');
-                $delivery['currency'] = $item['curr'];
-                $delivery['onePosition'] = $item['forone'] == 'Y';
-                $delivery['needAddress'] = $item['needAddress'] == 'Y';
-                $items[] = $delivery;
-            }
-
-            $data['count'] = sizeof($items);
-            $data['items'] = $items;
-            $this->result = $data;
-        } catch (Exception $e) {
-            $this->error = "Не удаётся получить список типов дооставок!";
-        }
-    }
+    protected $tableName = "shop_delivery";
 
     private function getConditionsParams($id)
     {
