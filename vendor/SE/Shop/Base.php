@@ -60,7 +60,7 @@ class Base
         }
     }
 
-    protected function init()
+    public function init()
     {
 
     }
@@ -155,6 +155,7 @@ class Base
                 $u->where($this->getWhereQuery($searchFields));
             $u->groupBy();
             $u->orderBy($this->sortBy, $this->sortOrder == 'desc');
+            writeLog($u->getSql());
             $this->result["items"] = $this->correctValuesBeforeFetch($u->getList($this->limit, $this->offset));
             $this->result["count"] = $u->getListCount();
             if (!empty($settingsFetch["aggregation"])) {

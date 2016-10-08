@@ -9,6 +9,15 @@ class Discount extends Base
 {
     protected $tableName = "shop_discount";
 
+    public function fetchByIdProduct($idProduct)
+    {
+        if (!$idProduct)
+            return [];
+
+        $this->setFilters(["field" => "idProduct", "value" => $idProduct]);
+        return $this->fetch();
+    }
+
     protected function getAddInfo()
     {
         $result["listGroupsProducts"] = $this->getListGroupsProducts($this->result["id"]);
