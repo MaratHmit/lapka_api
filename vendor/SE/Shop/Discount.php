@@ -18,6 +18,20 @@ class Discount extends Base
         return $this->fetch();
     }
 
+    protected function getSettingsFetch()
+    {
+        return [
+            "select" => 'sd.*, sdl.id_product idProduct',
+            "joins" => [
+                [
+                    "type" => "left",
+                    "table" => 'shop_discount_link sdl',
+                    "condition" => 'sdl.id_discount = sd.id'
+                ]
+            ]
+        ];
+    }
+
     protected function getAddInfo()
     {
         $result["listGroupsProducts"] = $this->getListGroupsProducts($this->result["id"]);

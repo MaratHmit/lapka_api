@@ -35,7 +35,7 @@ class Auth extends Base
         return $u->fetchOne()["id"];
     }
 
-    public function info()
+    public function info($id = null)
     {
         try {
             if (trim($this->input["login"]) == DB::$dbSerial &&

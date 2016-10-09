@@ -8,6 +8,8 @@ use SE\Exception;
 class Offer extends Base
 {
     protected $tableName = "shop_offer";
+    protected $sortBy = "sort";
+    protected $sortOrder = "asc";
     private $codePrice = "retail";
     private $idTypePrice;
 
@@ -70,8 +72,12 @@ class Offer extends Base
         foreach ($items as &$item) {
             $item["params"] = $this->getParamsByStr($item["params"]);
         }
-
         return $items;
+    }
+
+    protected function saveAddInfo()
+    {
+        return $this->savePrices();
     }
 
     private function getParamsByStr($params)
@@ -90,5 +96,20 @@ class Offer extends Base
         return $result;
     }
 
+    private function savePrices()
+    {
+        try {
+            $data["idCurrency"] = $_SESSION['idCurrency'];
+            $data["idTypeprice"] = $_SESSION['idTypePrice'];
+            $data["idOffer"] = $this->input["id"];
+            $t = new DB("shop_offer_price", "sop");
+            $t->select("id");
+            $t->where("id_offer = :idOffer AND id_typeprice = :idTypeprice AND id_currency = :idCurrency", $data);
+            $result = $t->fetchOne();
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удаётся сохранить цены торгового предложения!";
+        }
+    }
 
 }

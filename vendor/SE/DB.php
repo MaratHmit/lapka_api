@@ -375,7 +375,6 @@ class DB
             }
             return $items;
         } catch (\PDOException $e) {
-            writeLog($e->getMessage());
             throw new Exception($e->getMessage());
         }
     }

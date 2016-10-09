@@ -624,13 +624,16 @@ class Product extends Base
             $t = new DB("shop_offer", "so");
             $t->where("id_product IN (?)", $idsProductsStr);
             if ($idsOldStr)
-                $t->andWhere("NOT id IN (?)", $idsOld);
+                $t->andWhere("NOT id IN (?)", $idsOldStr);
             $t->deleteList();
 
             foreach ($idsProducts as $idProduct) {
                 foreach ($offers as $offer) {
                     $offer["idProduct"] = $idProduct;
-                    (new Offer($offer))->save();
+                    $this->error = (new Offer($offer))->save(false)->getError();
+                    writeLog($this->error);
+                    if ($this->error)
+                        throw new Exception($this->error);
                 }
             }
             return true;
@@ -645,7 +648,7 @@ class Product extends Base
 //            GROUP_CONCAT(CONCAT_WS("\t", sof.id_feature, sft.name, sfv.id, sfv.value) SEPARATOR "\n") params');
 //        $u->leftJoin('shop_offer_price sop', "sop.id_offer = so.id AND sop.id_typeprice = {$this->idTypePrice}");
 //        $u->leftJoin('shop_offer_feature sof', 'sof.id_offer = so.id');
-//        $u->leftJoin('shop_feature_translate sft', 'sft.id_feature = sof.id_feature');
+//        $u->leftJoin('shop_feature_translate sft', 'sft.  id_feature = sof.id_feature');
 //        $u->leftJoin('shop_feature_value sfv', 'sfv.id = sof.id_value');
 //        $u->where('so.id_product = ?', $id);
 //        $u->groupBy('so.id');

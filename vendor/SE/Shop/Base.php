@@ -43,11 +43,11 @@ class Base
         $input["idLang"] = $this->idLang;
         $this->input = $input;
         $this->hostname = HOSTNAME;
-        $this->limit = $input["limit"] && $this->limit ? (int)$input["limit"] : $this->limit;
-        $this->offset = $input["offset"] ? (int)$input["offset"] : $this->offset;
-        $this->sortOrder = $input["sortOrder"] ? $input["sortOrder"] : $this->sortOrder;
-        $this->sortBy = $input["sortBy"] ? $input["sortBy"] : $this->sortBy;
-        $this->search = $input["searchText"] && $this->allowedSearch ? $input["searchText"] : null;
+        $this->limit = !empty($input["limit"]) && $this->limit ? (int)$input["limit"] : $this->limit;
+        $this->offset = !empty($input["offset"]) ? (int)$input["offset"] : $this->offset;
+        $this->sortOrder = !empty($input["sortOrder"]) ? $input["sortOrder"] : $this->sortOrder;
+        $this->sortBy = !empty($input["sortBy"]) ? $input["sortBy"] : $this->sortBy;
+        $this->search = !empty($input["searchText"]) && $this->allowedSearch ? $input["searchText"] : null;
         $this->filters = empty($this->input["filters"]) || !is_array($this->input["filters"]) ?
             [] : $this->input["filters"];
         if (!empty($this->input["id"]) && empty($this->input["ids"]))
@@ -111,6 +111,11 @@ class Base
         }
     }
 
+    public function getError()
+    {
+        return $this->error;
+    }
+
     public function setFilters($filters)
     {
         $this->filters = empty($filters) || !is_array($filters) ? [] : $filters;
@@ -155,7 +160,6 @@ class Base
                 $u->where($this->getWhereQuery($searchFields));
             $u->groupBy();
             $u->orderBy($this->sortBy, $this->sortOrder == 'desc');
-            writeLog($u->getSql());
             $this->result["items"] = $this->correctValuesBeforeFetch($u->getList($this->limit, $this->offset));
             $this->result["count"] = $u->getListCount();
             if (!empty($settingsFetch["aggregation"])) {
@@ -237,11 +241,12 @@ class Base
         }
     }
 
-    public function save()
+    public function save($isTransactionMode = true)
     {
         try {
             $this->correctValuesBeforeSave();
-            DB::beginTransaction();
+            if ($isTransactionMode)
+                DB::beginTransaction();
             $u = new DB($this->tableName);
             if (isset($this->input["imagePath"]))
                 $this->input["idImage"] = $this->saveImage();
@@ -264,11 +269,13 @@ class Base
                 $this->input["ids"] = array($this->input["id"]);
             if ($this->input["id"] && $this->saveAddInfo()) {
                 $this->info();
-                DB::commit();
+                if ($isTransactionMode)
+                    DB::commit();
                 return $this;
-            } else throw new Exception();
+            } else throw new Exception("Не удаётся сохранить дополнительную информацию!");
         } catch (Exception $e) {
-            DB::rollBack();
+            if ($isTransactionMode)
+                DB::rollBack();
             $this->error = empty($this->error) ? "Не удаётся сохранить информацию об объекте!" : $this->error;
         }
     }
@@ -336,7 +343,7 @@ class Base
                     $u->setValuesFields($image);
                     $u->save();
                 }
-                if ($image["idImage"]) {
+                if (!empty($image["idImage"])) {
                     if ($image["idTranslate"])
                         $data["id"] = $image["idTranslate"];
                     else {
