@@ -11,30 +11,15 @@ class Offer extends Base
     protected $sortBy = "sort";
     protected $sortOrder = "asc";
     private $codePrice = "retail";
-    private $idTypePrice;
 
     public function fetchByIdProduct($idProduct)
     {
         if (!$idProduct)
             return [];
 
-        $this->init();
         $this->setFilters(["field" => "idProduct", "value" => $idProduct]);
         return $this->fetch();
     }
-
-    public function init()
-    {
-        if (empty($_SESSION["idTypePrice"])) {
-            $t = new DB("shop_typeprice");
-            $t->select("id");
-            $t->where("code = '?'", $this->codePrice);
-            $result = $t->fetchOne();
-            $_SESSION["idTypePrice"] = $result["id"];
-        }
-        $this->idTypePrice = $_SESSION["idTypePrice"];
-    }
-
 
     protected function getSettingsFetch()
     {
@@ -46,7 +31,7 @@ class Offer extends Base
                 [
                     "type" => "left",
                     "table" => 'shop_offer_price sop',
-                    "condition" => "sop.id_offer = so.id AND sop.id_typeprice = {$this->idTypePrice}"
+                    "condition" => "sop.id_offer = so.id AND sop.id_typeprice = {$_SESSION["idTypePrice"]}"
                 ],
                 [
                     "type" => "left",
@@ -77,7 +62,7 @@ class Offer extends Base
 
     protected function saveAddInfo()
     {
-        return $this->savePrices();
+        return $this->savePrices() && $this->saveCounts() && $this->saveFeatures();
     }
 
     private function getParamsByStr($params)
@@ -105,10 +90,45 @@ class Offer extends Base
             $t = new DB("shop_offer_price", "sop");
             $t->select("id");
             $t->where("id_offer = :idOffer AND id_typeprice = :idTypeprice AND id_currency = :idCurrency", $data);
-            $result = $t->fetchOne();
+            if ($result = $t->fetchOne())
+                $data["id"] = $result["id"];
+            $data["value"] = $this->input["price"];
+            $t = new DB("shop_offer_price", "sop");
+            $t->setValuesFields($data);
+            $t->save();
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить цены торгового предложения!";
+        }
+    }
+
+    private function saveCounts()
+    {
+        try {
+            $data["idWarehouse"] = $_SESSION['idWarehouse'];
+            $data["idOffer"] = $this->input["id"];
+            $t = new DB("shop_warehouse_stock", "sws");
+            $t->select("id");
+            $t->where("id_warehouse = :idWarehouse AND id_offer = :idOffer", $data);
+            if ($result = $t->fetchOne())
+                $data["id"] = $result["id"];
+            $data["value"] = $this->input["count"];
+            $t = new DB("shop_warehouse_stock", "sws");
+            $t->setValuesFields($data);
+            $t->save();
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удаётся сохранить количество торгового предложения!";
+        }
+    }
+
+    private function saveFeatures()
+    {
+        try {
+
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удаётся сохранить параметры торгового предложения!";
         }
     }
 

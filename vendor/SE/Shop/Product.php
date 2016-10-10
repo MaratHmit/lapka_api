@@ -8,20 +8,6 @@ use SE\Exception;
 class Product extends Base
 {
     protected $tableName = "shop_product";
-    private $codePrice = "retail";
-    private $idTypePrice;
-
-    public function init()
-    {
-        if (empty($_SESSION["idTypePrice"])) {
-            $t = new DB("shop_typeprice");
-            $t->select("id");
-            $t->where("code = '?'", $this->codePrice);
-            $result = $t->fetchOne();
-            $_SESSION["idTypePrice"] = $result["id"];
-        }
-        $this->idTypePrice = $_SESSION["idTypePrice"];
-    }
 
     protected function getSettingsFetch()
     {
@@ -48,7 +34,7 @@ class Product extends Base
                 [
                     "type" => "left",
                     "table" => 'shop_offer_price sop',
-                    "condition" => "sop.id_offer = so.id AND sop.id_typeprice = {$this->idTypePrice}"
+                    "condition" => "sop.id_offer = so.id AND sop.id_typeprice = {$_SESSION["idTypePrice"]}"
                 ],
                 [
                     "type" => "left",
@@ -631,7 +617,6 @@ class Product extends Base
                 foreach ($offers as $offer) {
                     $offer["idProduct"] = $idProduct;
                     $this->error = (new Offer($offer))->save(false)->getError();
-                    writeLog($this->error);
                     if ($this->error)
                         throw new Exception($this->error);
                 }

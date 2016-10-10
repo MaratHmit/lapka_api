@@ -35,11 +35,20 @@ class Auth extends Base
         return $u->fetchOne()["id"];
     }
 
+    private function getIdTypePrice()
+    {
+        $t = new DB("shop_typeprice");
+        $t->select("id");
+        $t->where("code = 'retail'");
+        return $t->fetchOne()["id"];
+    }
+
     public function info($id = null)
     {
         try {
             if (trim($this->input["login"]) == DB::$dbSerial &&
-                trim($this->input["hash"]) == md5(DB::$projectKey)) {
+                trim($this->input["hash"]) == md5(DB::$projectKey)
+            ) {
                 $data['userDisplay'] = 'Администратор';
                 $data['isAdmin'] = true;
                 $data['hostname'] = $this->hostname;
@@ -54,6 +63,8 @@ class Auth extends Base
                 $_SESSION['hostname'] = HOSTNAME;
                 $_SESSION['idLang'] = 1;
                 $_SESSION['idCurrency'] = $this->getIdCurrency();
+                $_SESSION["idTypePrice"] = $this->getIdTypePrice();
+                $_SESSION["idWarehouse"] = 1;
 
                 $this->result = $data;
             } else {
