@@ -26,7 +26,7 @@ class Offer extends Base
         return [
             "select" => 'so.*, sop.value price, 
                 (SELECT SUM(sfs.value) FROM shop_warehouse_stock sfs WHERE sfs.id_offer = so.id GROUP BY sfs.id_offer) count,
-                GROUP_CONCAT(CONCAT_WS("\t", sof.id_feature, sft.name, sfv.id, sfv.value) SEPARATOR "\n") params',
+                GROUP_CONCAT(CONCAT_WS("\t", sof.id, sof.id_feature, sft.name, sfv.id, sfv.value) SEPARATOR "\n") params',
             "joins" => [
                 [
                     "type" => "left",
@@ -72,10 +72,11 @@ class Offer extends Base
         foreach ($items as $item) {
             $param = array();
             $values = explode("\t", $item);
-            $param["idFeature"] = $values[0];
-            $param["name"] = $values[1];
-            $param["idValue"] = $values[2];
-            $param["value"] = $values[3];
+            $param["id"] = $values[0];
+            $param["idFeature"] = $values[1];
+            $param["name"] = $values[2];
+            $param["idValue"] = $values[3];
+            $param["value"] = $values[4];
             $result[] = $param;
         }
         return $result;
@@ -125,7 +126,26 @@ class Offer extends Base
     private function saveFeatures()
     {
         try {
-
+            $params = $this->input["params"];
+            $idOffer = $this->input["id"];
+            $idsExist = [];
+            foreach ($params as $param)
+                if ($param["id"])
+                    $idsExist[] = $param["id"];
+            $idsExistStr = implode(",", $idsExist);
+            $t = new DB('shop_offer_feature', 'sof');
+            $t->where("id_offer = ?", $idOffer);
+            if ($idsExist)
+                $t->andWhere("NOT id IN (?)", $idsExistStr);
+            $t->deleteList();
+            foreach ($params as $param) {
+                if (!empty($param['idValue'])) {
+                    $param["idOffer"] = $idOffer;
+                    $t = new DB('shop_offer_feature', 'sof');
+                    $t->setValuesFields($param);
+                    $t->save();
+                }
+            }
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить параметры торгового предложения!";
