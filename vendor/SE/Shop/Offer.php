@@ -26,6 +26,7 @@ class Offer extends Base
         return [
             "select" => 'so.*, sop.value price, 
                 (SELECT SUM(sfs.value) FROM shop_warehouse_stock sfs WHERE sfs.id_offer = so.id GROUP BY sfs.id_offer) count,
+                sod.weight weight,
                 GROUP_CONCAT(CONCAT_WS("\t", sof.id, sof.id_feature, sft.name, sfv.id, sfv.value) SEPARATOR "\n") params',
             "joins" => [
                 [
@@ -47,6 +48,11 @@ class Offer extends Base
                     "type" => "left",
                     "table" => 'shop_feature_value sfv',
                     "condition" => "sfv.id = sof.id_value"
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_offer_dimension sod',
+                    "condition" => "sod.id_offer = so.id"
                 ]
             ]
         ];
@@ -62,7 +68,7 @@ class Offer extends Base
 
     protected function saveAddInfo()
     {
-        return $this->savePrices() && $this->saveCounts() && $this->saveFeatures();
+        return $this->savePrices() && $this->saveCounts() && $this->saveFeatures() && $this->saveDimension();
     }
 
     private function getParamsByStr($params)
@@ -149,6 +155,18 @@ class Offer extends Base
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить параметры торгового предложения!";
+        }
+    }
+
+    private function saveDimension()
+    {
+        try {
+            $idOffer = $this->input["id"];
+
+
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удаётся сохранить размеры и вес торгового предложения!";
         }
     }
 
