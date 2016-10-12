@@ -12,7 +12,7 @@ class Functions extends Base
         $i = 0;
         $items = array();
         foreach ($vars as $var) {
-            $items[] = se_translite_url($var);
+            $items[] = $this->transliterationUrl($var);
             $i++;
         }
 

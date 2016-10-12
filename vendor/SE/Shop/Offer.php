@@ -10,7 +10,6 @@ class Offer extends Base
     protected $tableName = "shop_offer";
     protected $sortBy = "sort";
     protected $sortOrder = "asc";
-    private $codePrice = "retail";
 
     public function fetchByIdProduct($idProduct)
     {
@@ -99,7 +98,7 @@ class Offer extends Base
             $t->where("id_offer = :idOffer AND id_typeprice = :idTypeprice AND id_currency = :idCurrency", $data);
             if ($result = $t->fetchOne())
                 $data["id"] = $result["id"];
-            $data["value"] = $this->input["price"];
+            $data["value"] = (real) $this->input["price"];
             $t = new DB("shop_offer_price", "sop");
             $t->setValuesFields($data);
             $t->save();
@@ -119,7 +118,7 @@ class Offer extends Base
             $t->where("id_warehouse = :idWarehouse AND id_offer = :idOffer", $data);
             if ($result = $t->fetchOne())
                 $data["id"] = $result["id"];
-            $data["value"] = $this->input["count"];
+            $data["value"] = (real) $this->input["count"];
             $t = new DB("shop_warehouse_stock", "sws");
             $t->setValuesFields($data);
             $t->save();
@@ -161,9 +160,16 @@ class Offer extends Base
     private function saveDimension()
     {
         try {
-            $idOffer = $this->input["id"];
-
-
+            $data["idOffer"] = $this->input["id"];
+            $t = new DB("shop_offer_dimension", "sod");
+            $t->select("id");
+            $t->where("id_offer = ?", $data["idOffer"]);
+            if ($result = $t->fetchOne())
+                $data["id"] = $result["id"];
+            $data["weight"] = $this->input["weight"];
+            $t = new DB("shop_offer_dimension", "sod");
+            $t->setValuesFields($data);
+            $t->save();
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить размеры и вес торгового предложения!";

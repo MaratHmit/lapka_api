@@ -284,6 +284,14 @@ class Product extends Base
         return $specification;
     }
 
+    protected function correctValuesBeforeSave()
+    {
+        if ($this->isNew && !empty($this->input["idGroup"]))
+            $this->input["idType"] = $this->getDefaultIdType();
+
+        return true;
+    }
+
     protected function saveAddInfo()
     {
         if (!$this->input["ids"])
@@ -291,6 +299,19 @@ class Product extends Base
 
         return $this->createDefaultOffer() && $this->saveListImages() && $this->saveGroups() &&
             $this->saveOffers();
+    }
+
+    private function getDefaultIdType()
+    {
+        try {
+            $t = new DB("shop_group", "sg");
+            $t->select("sg.id_type");
+            $t->where("sg.id = ?", $this->input["idGroup"]);
+            return $t->fetchOne()["idType"];
+        } catch (Exception $e) {
+
+        }
+        return null;
     }
 
     private function saveSpecifications()
@@ -525,6 +546,8 @@ class Product extends Base
 
     private function saveGroups()
     {
+        if ($this->isNew && !empty($this->input["idGroup"]) && !isset($this->input["groups"]))
+            $this->input["groups"][] = ["id" => $this->input["idGroup"]];
         if (!isset($this->input["groups"]))
             return true;
 
@@ -577,19 +600,34 @@ class Product extends Base
         if (!$this->isNew)
             return true;
 
-        $idType = !empty($this->input["idType"]) ? $this->input["idType"] : null;
-        if (!empty($this->input["idGroup"]) && empty($idType)) {
-
+        try {
+            $idOffer = null;
+            $idType = !empty($this->input["idType"]) ? $this->input["idType"] : null;
+            $idsProducts = $this->input["ids"];
+            foreach ($idsProducts as $idProduct) {
+                $offer = ["idProduct" => $idProduct];
+                $u = new DB('shop_offer', 'so');
+                $u->setValuesFields($offer);
+                $idOffer = $u->save();
+            }
+            if ($idType && $idOffer) {
+                $t = new DB("shop_type_feature", "stf");
+                $t->select("sf.id id_feature, sfv.id id_value");
+                $t->innerJoin("shop_feature sf", "sf.id = stf.id_feature AND sf.target = 1");
+                $t->innerJoin("(SELECT id, id_feature FROM shop_feature_value GROUP BY id_feature ORDER BY sort) sfv", "sfv.id_feature = sf.id");
+                $items = $t->getList();
+                foreach ($items as $item) {
+                    $item["idOffer"] = $idOffer;
+                    $u = new DB("shop_offer_feature", "sof");
+                    $u->setValuesFields($item);
+                    $u->save();
+                }
+            }
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удаётся создать параметры товара по умолчанию!";
+            throw new Exception($e->getMessage());
         }
-
-        $idsProducts = $this->input["ids"];
-        foreach ($idsProducts as $idProduct) {
-            $offer = ["idProduct" => $idProduct];
-            $u = new DB('shop_offer', 'so');
-            $u->setValuesFields($offer);
-            $offer["idOffer"] = $u->save();
-        }
-        return true;
     }
 
     private function saveOffers()
@@ -626,18 +664,6 @@ class Product extends Base
             $this->error = "Не удаётся сохранить параметры товара!";
         }
         return false;
-
-        //        $u = new DB('shop_offer', 'so');
-//        $u->select('so.*, sop.value price,
-//            (SELECT SUM(sfs.value) FROM shop_warehouse_stock sfs WHERE sfs.id_offer = so.id GROUP BY sfs.id_offer) count,
-//            GROUP_CONCAT(CONCAT_WS("\t", sof.id_feature, sft.name, sfv.id, sfv.value) SEPARATOR "\n") params');
-//        $u->leftJoin('shop_offer_price sop', "sop.id_offer = so.id AND sop.id_typeprice = {$this->idTypePrice}");
-//        $u->leftJoin('shop_offer_feature sof', 'sof.id_offer = so.id');
-//        $u->leftJoin('shop_feature_translate sft', 'sft.  id_feature = sof.id_feature');
-//        $u->leftJoin('shop_feature_value sfv', 'sfv.id = sof.id_value');
-//        $u->where('so.id_product = ?', $id);
-//        $u->groupBy('so.id');
-
     }
 
     private function getGroup($groups, $idGroup)

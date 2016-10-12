@@ -278,6 +278,7 @@ class Base
                 DB::rollBack();
             $this->error = empty($this->error) ? "Не удаётся сохранить информацию об объекте!" : $this->error;
         }
+        return $this;
     }
 
     public function getIdImageFolder($dir)
