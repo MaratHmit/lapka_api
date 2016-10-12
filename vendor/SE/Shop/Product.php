@@ -499,35 +499,6 @@ class Product extends Base
         }
     }
 
-    private function saveCrossGroups()
-    {
-        if (!isset($this->input["crossGroups"]))
-            return true;
-
-        try {
-            $idsProducts = $this->input["ids"];
-            $groups = $this->input["crossGroups"];
-            $idsStr = implode(",", $idsProducts);
-            if (CORE_VERSION == "5.3") {
-                $u = new DB('shop_price_group', 'spg');
-                $u->where('NOT is_main AND id_price in (?)', $idsStr)->deleteList();
-                foreach ($groups as $group)
-                    foreach ($idsProducts as $idProduct)
-                        $data[] = array('id_price' => $idProduct, 'id_group' => $group["id"], 'is_main' => 0);
-                if (!empty($data)) {
-                    DB::insertList('shop_price_group', $data);
-                }
-            } else
-                foreach ($idsProducts as $id)
-                    DB::saveManyToMany($id, $groups,
-                        array("table" => "shop_group_price", "key" => "price_id", "link" => "group_id"));
-            return true;
-        } catch (Exception $e) {
-            $this->error = "Не удаётся сохранить дополнительные категории товара!";
-            throw new Exception($this->error);
-        }
-    }
-
     private function saveDiscounts()
     {
         if (!isset($this->input["discounts"]))
@@ -664,21 +635,6 @@ class Product extends Base
             $this->error = "Не удаётся сохранить параметры товара!";
         }
         return false;
-    }
-
-    private function getGroup($groups, $idGroup)
-    {
-        if (!$idGroup)
-            return null;
-
-        foreach ($groups as $group) {
-            if ($group["id"] == $idGroup) {
-                if ($group['upid'])
-                    return $this->getGroup($groups, $group['upid']) . "/" . $group["name"];
-                else return $group["name"];
-            }
-        }
-        return null;
     }
 
 }
