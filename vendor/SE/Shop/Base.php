@@ -683,7 +683,7 @@ class Base
             for ($i = 0; $i < $countFiles; $i++) {
                 $file = empty($_FILES["file"]) ? $_FILES["file$i"]['name'] : $_FILES["file"]['name'];
                 $uploadFile = $dir . '/' . $file;
-                $fileTemp = $_FILES["file$i"]['tmp_name'];
+                $fileTemp = empty($_FILES["file"]) ? $_FILES["file$i"]['tmp_name'] : $_FILES["file"]['tmp_name'];
                 $urlFile = 'http://' . HOSTNAME . "/files/{$file}";
                 if (!filesize($fileTemp) || move_uploaded_file($fileTemp, $uploadFile)) {
                     $items[] = array("url" => $urlFile, "name" => $file);
