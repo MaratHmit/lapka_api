@@ -83,7 +83,7 @@ class User extends Base
     private function getLogin($name, $login, $id = 0)
     {
         if (empty($login))
-            $login = strtolower(rus2translit($name));
+            $login = $this->rusToTransliteration($name);
         $loginN = $login;
 
         $u = new DB('user', 'u');
@@ -143,6 +143,7 @@ class User extends Base
             if ($contact)
                 $this->input = $contact;
             DB::beginTransaction();
+            writeLog("ok");
 
             $ids = array();
             if (empty($this->input["ids"]) && !empty($this->input["id"]))
@@ -151,6 +152,7 @@ class User extends Base
             $isNew = empty($ids);
             if ($isNew) {
                 $this->input["login"] = $this->getLogin($this->input["name"], $this->input["login"]);
+                writeLog($this->input);
                 if (!empty($this->input["login"])) {
                     $u = new DB('user', 'u');
                     $u->setValuesFields($this->input);
