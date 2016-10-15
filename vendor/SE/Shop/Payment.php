@@ -6,7 +6,7 @@ use SE\DB as DB;
 
 class Payment extends Base
 {
-    protected $tableName = "shop_order_payee";
+    protected $tableName = "shop_order_payment";
 
     public function save()
     {
@@ -18,25 +18,38 @@ class Payment extends Base
 
     protected function getSettingsFetch()
     {
-        return array(
-            "select" => 'sop.*, (SELECT name_payment FROM shop_payment WHERE id = sop.payment_type) name,
-                IFNULL(c.name,  CONCAT_WS(" ", p.last_name, p.first_name, p.sec_name)) payer',
-            "joins" => array(
-                array(
+        return [
+            "select" => 'sop.*, pt.date date, pt.amount amount, pt.note note,
+                IFNULL(c.name,  u.name) payer,
+                DATE_FORMAT(pt.date, "%d.%m.%Y %H:%i") date_display',
+            "joins" => [
+                [
                     "type" => "left",
-                    "table" => 'person p',
-                    "condition" => 'p.id = sop.id_author'),
-                array(
+                    "table" => 'payment_transaction pt',
+                    "condition" => 'pt.id = sop.id_transaction'
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'user u',
+                    "condition" => 'u.id = pt.id_user'
+                ],
+                [
                     "type" => "left",
                     "table" => 'company c',
-                    "condition" => 'c.id = sop.id_company'),
-            ),
-            "aggregation" => array(
+                    "condition" => 'c.id = pt.id_company'
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'payment_system ps',
+                    "condition" => 'ps.id = pt.id_system'
+                ]
+            ],
+            "aggregation" => [
                 "type" => "SUM",
                 "field" => "amount",
                 "name" => "totalAmount"
-            )
-        );
+            ]
+        ];
     }
 
     protected function getSettingsInfo()

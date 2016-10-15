@@ -23,7 +23,8 @@ class Offer extends Base
     protected function getSettingsFetch()
     {
         return [
-            "select" => 'so.*, sop.value price, 
+            "select" => 'so.*, spt.name name, sop.value price,
+                GROUP_CONCAT(CONCAT_WS(": ", sft.name, sfv.value) SEPARATOR ", ") name_params,
                 (SELECT SUM(sfs.value) FROM shop_warehouse_stock sfs WHERE sfs.id_offer = so.id GROUP BY sfs.id_offer) count,
                 sod.weight weight,
                 GROUP_CONCAT(CONCAT_WS("\t", sof.id, sof.id_feature, sft.name, sfv.id, sfv.value) SEPARATOR "\n") params',
@@ -52,6 +53,11 @@ class Offer extends Base
                     "type" => "left",
                     "table" => 'shop_offer_dimension sod',
                     "condition" => "sod.id_offer = so.id"
+                ],
+                [
+                    "type" => "inner",
+                    "table" => 'shop_product_translate spt',
+                    "condition" => "spt.id_product = so.id_product"
                 ]
             ]
         ];
@@ -61,6 +67,8 @@ class Offer extends Base
     {
         foreach ($items as &$item) {
             $item["params"] = $this->getParamsByStr($item["params"]);
+            if ($item["nameParams"])
+                $item["name"] .= " - {$item["nameParams"]}";
         }
         return $items;
     }
@@ -98,7 +106,7 @@ class Offer extends Base
             $t->where("id_offer = :idOffer AND id_typeprice = :idTypeprice AND id_currency = :idCurrency", $data);
             if ($result = $t->fetchOne())
                 $data["id"] = $result["id"];
-            $data["value"] = (real) $this->input["price"];
+            $data["value"] = (real)$this->input["price"];
             $t = new DB("shop_offer_price", "sop");
             $t->setValuesFields($data);
             $t->save();
@@ -118,7 +126,7 @@ class Offer extends Base
             $t->where("id_warehouse = :idWarehouse AND id_offer = :idOffer", $data);
             if ($result = $t->fetchOne())
                 $data["id"] = $result["id"];
-            $data["value"] = (real) $this->input["count"];
+            $data["value"] = (real)$this->input["count"];
             $t = new DB("shop_warehouse_stock", "sws");
             $t->setValuesFields($data);
             $t->save();

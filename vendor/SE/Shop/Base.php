@@ -181,6 +181,9 @@ class Base
     {
         $id = empty($id) ? $this->input["id"] : $id;
         $this->input["id"] = $id;
+        if (empty($id))
+            return null;
+
         $settingsInfo = $this->getSettingsInfo();
         try {
             $u = $this->createTableForInfo($settingsInfo);
