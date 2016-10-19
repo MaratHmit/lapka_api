@@ -387,7 +387,7 @@ class Base
             if (!empty($data))
                 DB::insertList("{$tableImages}", $data);
             if (!empty($dataTranslate))
-                DB::insertList('image_translate', $dataTranslate);
+                DB::insertList('image_translate', $dataTranslate, true);
 
             return true;
         } catch (Exception $e) {

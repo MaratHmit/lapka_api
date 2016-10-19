@@ -11,9 +11,28 @@ class Import extends Base
     private $separator;
     private $dirFiles;
     private $maxHeaderRows = 25;
-    private $catalogCols = ["Корневая категория", "Подкатегория 1", "Подкатегория 2", "Подкатегория 3", "Подкатегория 4"];
-    private $productsCols = ["Артикул", "Название товара", "Цена продажи", "Цена закупки", "Остаток", "Вес (гр.)", "Скидка",
-        "Краткое описание", "Полное описание", "Изображение", "Тег title", "Мета-тег keywords", "Мета-тег description"];
+    private $catalogCols = [
+        ["title" => "Корневая категория", "name" => "catalog0"],
+        ["title" => "Подкатегория 1", "name" => "catalog1"],
+        ["title" => "Подкатегория 2", "name" => "catalog2"],
+        ["title" => "Подкатегория 3", "name" => "catalog3"],
+        ["title" => "Подкатегория 4", "name" => "catalog4"]
+    ];
+    private $productsCols = [
+        ["title" => "Артикул", "name" => "article"],
+        ["title" => "Название товара", "name" => "name"],
+        ["title" => "Цена продажи"],
+        ["title" => "Цена закупки"],
+        ["title" => "Остаток"],
+        ["title" => "Вес (гр.)"],
+        ["title" => "Скидка"],
+        ["title" => "Краткое описание"],
+        ["title" => "Полное описание"],
+        ["title" => "Изображение"],
+        ["title" => "Тег title"],
+        ["title" => "Мета-тег keywords"],
+        ["title" => "Мета-тег description"]
+    ];
     private $featureCols = [];
 
     function __construct($input)
@@ -28,7 +47,13 @@ class Import extends Base
     {
         $items = parent::post();
         if (count($items))
-            $this->result = $this->getFileFields($items[0]["name"]);
+            $this->result = array_merge(["encoding" => $this->encoding, "separator" => $this->separator],
+                $this->getFileFields($items[0]["name"]));
+    }
+
+    public function exec()
+    {
+
     }
 
     private function getFileFields($fileName)
@@ -40,9 +65,9 @@ class Import extends Base
         $str = file_get_contents($filePath);
         $this->encoding = $this->encoding == "auto" ? mb_detect_encoding($str, "auto") : $this->encoding;
         $this->separator = $this->separator == "auto" ? $this->getSeparator($filePath) : $this->separator;
-        $result["fileName"] = basename($filePath);
-        $result["count"] = $this->getCountColsFromCsv($filePath);
-        $result["fields"] = $this->getFields();
+        $fields = $this->getFields();
+        $result["fileImport"] = basename($filePath);
+        $result["cols"] = $this->getColsFromCsv($filePath, $fields);
         return $result;
     }
 
@@ -79,7 +104,7 @@ class Import extends Base
         return ",";
     }
 
-    private function getCountColsFromCsv($file)
+    private function getColsFromCsv($file, $fields)
     {
         $count = 0;
         if (($handle = fopen($file, "r")) !== false) {
@@ -90,13 +115,20 @@ class Import extends Base
             }
         }
         fclose($handle);
-        return $count;
+        $cols = [];
+        for ($i = 0; $i < $count; $i++)
+            $cols[] = ["id" => $i, "title" => "Столбец № {$i}", "fields" => $fields];
+        return $cols;
     }
 
     private function getFields()
     {
         $this->featureCols = $this->getFeatureCols();
-        $result = ["Категория" => $this->catalogCols, "Товар" => $this->productsCols, "Свойства" => $this->featureCols];
+        $result = [
+            ["title" => "Категория", "items" => $this->catalogCols],
+            ["title" => "Товар", "items" => $this->productsCols],
+            ["title" => "Свойства", "items" => $this->featureCols]
+        ];
 
         return $result;
     }
@@ -109,7 +141,7 @@ class Import extends Base
         $t->innerJoin("shop_feature_translate sft", "sft.id_feature = sf.id");
         $items = $t->getList();
         foreach ($items as $item)
-            $result[] = $item["name"];
+            $result[] = ["title" => $item["name"]];
         return $result;
     }
 }
