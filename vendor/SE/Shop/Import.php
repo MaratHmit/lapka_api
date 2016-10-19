@@ -7,8 +7,8 @@ use SE\Exception;
 
 class Import extends Base
 {
-    private $encoding;
-    private $separator;
+    private $encodingDef;
+    private $separatorDef;
     private $dirFiles;
     private $maxHeaderRows = 25;
     private $catalogCols = [
@@ -39,34 +39,59 @@ class Import extends Base
     {
         parent::__construct($input);
         $this->dirFiles = DOCUMENT_ROOT . "/files";
-        $this->encoding = $_POST["encoding"];
-        $this->separator = $_POST["separator"];
+        $this->encodingDef = $_POST["encoding"];
+        $this->separatorDef = $_POST["separator"];
     }
 
     public function post()
     {
         $items = parent::post();
         if (count($items))
-            $this->result = array_merge(["encoding" => $this->encoding, "separator" => $this->separator],
-                $this->getFileFields($items[0]["name"]));
+            $this->result = array_merge($_POST, $this->getFileSettings($items[0]["name"]));
     }
 
     public function exec()
     {
+        $fileName = $this->input["fileImport"];
+        $cols = $this->input["cols"];
+        $filePath = "{$this->dirFiles}/{$fileName}";
+        $encoding = $this->input["encodingDef"];
+        $separator = $this->input["separatorDef"];
 
+        if (($handle = fopen($filePath, "r")) !== false) {
+            $r = 0;
+            while (($row = fgetcsv($handle, 16000, $separator)) !== false) {
+                if ($r) {
+                    $i = 0;
+                    $product = [];
+                    foreach ($row as $key => $value) {
+                        if (!empty($cols[$i]["code"])) {
+                            if ($encoding != "UTF-8")
+                                $value = iconv('CP1251', 'utf-8', $value);
+                            $product[$cols[$i]["code"]] = $value;
+                        }
+                        $i++;
+                    }
+                    $this->importProduct($product);
+                }
+                $r++;
+            }
+        }
+        fclose($handle);
     }
 
-    private function getFileFields($fileName)
+    private function getFileSettings($fileName)
     {
         $filePath = "{$this->dirFiles}/{$fileName}";
         $ext = end(explode(".", $fileName));
         if ($ext != "csv")
             $filePath = $this->getConvertFile($filePath);
-        $str = file_get_contents($filePath);
-        $this->encoding = $this->encoding == "auto" ? mb_detect_encoding($str, "auto") : $this->encoding;
-        $this->separator = $this->separator == "auto" ? $this->getSeparator($filePath) : $this->separator;
+        $this->encodingDef = $this->encodingDef == "auto" ? (($ext == "csv") ? "CP1251" : "UTF-8") : $this->encodingDef;
+        $this->separatorDef = $this->separatorDef == "auto" ? $this->getSeparator($filePath) : $this->separatorDef;
         $fields = $this->getFields();
         $result["fileImport"] = basename($filePath);
+        $result["encodingDef"] = $this->encodingDef;
+        $result["separatorDef"] = $this->separatorDef;
         $result["cols"] = $this->getColsFromCsv($filePath, $fields);
         return $result;
     }
@@ -109,7 +134,7 @@ class Import extends Base
         $count = 0;
         if (($handle = fopen($file, "r")) !== false) {
             $i = 0;
-            while (($row = fgetcsv($handle, 16000, $this->separator)) !== false && $i++ < $this->maxHeaderRows) {
+            while (($row = fgetcsv($handle, 16000, $this->separatorDef)) !== false && $i++ < $this->maxHeaderRows) {
                 if (count($row) > $count)
                     $count = count($row);
             }
@@ -143,5 +168,18 @@ class Import extends Base
         foreach ($items as $item)
             $result[] = ["title" => $item["name"]];
         return $result;
+    }
+
+    private function importProduct($productData = [])
+    {
+        if (!$productData)
+            return false;
+
+        /*
+        $product = new Product($productData);
+        $product->save();
+        */
+
+        return true;
     }
 }
