@@ -223,6 +223,28 @@ class Product extends Base
         return (new Discount())->fetchByIdProduct($idProduct ? $idProduct : $this->input["id"]);
     }
 
+    public function saveByKeyField($key)
+    {
+        if (empty($key))
+            $key = "article";
+
+        try {
+            if (empty($this->input[$key]))
+                return true;
+
+            $t = new DB("shop_offer", "so");
+            $t->select("so.id_product");
+            $t->where("so.{$key} = '?'", $this->input[$key]);
+            $result = $t->fetchOne();
+            if (!empty($result["id_product"]))
+                $this->input["id"] = $result["id_product"];
+            return $this->save();
+        } catch (Exception $e) {
+            $this->error = "Не удаётся получить ид. товара по заданному ключу!";
+            throw new Exception($this->error);
+        }
+    }
+
     protected function getAddInfo()
     {
         $result = array();
@@ -574,9 +596,10 @@ class Product extends Base
         try {
             $idOffer = null;
             $idType = !empty($this->input["idType"]) ? $this->input["idType"] : null;
+            $article = !empty($this->input["article"]) ? $this->input["article"] : null;
             $idsProducts = $this->input["ids"];
             foreach ($idsProducts as $idProduct) {
-                $offer = ["idProduct" => $idProduct];
+                $offer = ["idProduct" => $idProduct, "article" => $article];
                 $u = new DB('shop_offer', 'so');
                 $u->setValuesFields($offer);
                 $idOffer = $u->save();
