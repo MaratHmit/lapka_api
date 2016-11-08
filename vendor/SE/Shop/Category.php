@@ -109,7 +109,7 @@ class Category extends Base
     {
         return [
             "select" => "sg.*, tr.id id_translate, tr.name, tr.description, tr.content,
-                tr.meta_title, tr.meta_keywords, tr.meta_description,               
+                tr.meta_title, tr.meta_keywords, tr.meta_description, tr.page_title,              
                 GROUP_CONCAT(CONCAT_WS(':', sgtp.level, sgt.id_parent) SEPARATOR ';') ids_parents,
                 sgt.id_parent id_parent, sgt.level level",
             "joins" => [

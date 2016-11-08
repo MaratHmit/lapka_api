@@ -12,23 +12,41 @@ class User extends Base
     protected function getSettingsFetch()
     {
         return array(
-            "select" => 'u.*, ug.id_group id_group,
-                0 count_orders, 0 amount_orders, 0 paid_orders',
-            "joins" => array(
-                array(
+            "select" => "u.*, ug.id_group id_group,
+                0 count_orders, 0 amount_orders, 0 paid_orders,
+                CONCAT('/', IF(img_fld.name IS NULL, '', CONCAT(img_fld.name, '/')), img.name) image_path",
+            "joins" => [
+                [
                     "type" => "left",
                     "table" => "user_usergroup ug",
                     "condition" => "u.id = ug.id_user"
-                )
-            )
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'image img',
+                    "condition" => "u.id_image = img.id"
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'image_folder img_fld',
+                    "condition" => 'img.id_folder = img_fld.id'
+                ]
+            ]
         );
     }
 
+
     protected function getAddInfo()
     {
+        $result['pets'] = $this->getPets();
         $result['groups'] = $this->getGroups();
         $result["customFields"] = $this->getCustomFields();
         return $result;
+    }
+
+    private function getPets()
+    {
+        return [];
     }
 
     private function getCustomFields()
@@ -42,7 +60,7 @@ class User extends Base
         $u->leftJoin('shop_field_value fv', "fv.id_field = f.id AND id_user = {$idUser}");
         $u->leftJoin('shop_field_group fg', 'fg.id = f.id_group');
         $u->leftJoin('shop_field_group_translate fgt', 'fgt.id_group = fg.id');
-        $u->where('f.data = "user"');
+        $u->where('f.target = 0');
         $u->groupBy('f.id');
         $u->orderBy('fg.sort');
         $u->addOrderBy('f.sort');
@@ -150,9 +168,10 @@ class User extends Base
                 $ids[] = $this->input["id"];
             else $ids = $this->input["ids"];
             $isNew = empty($ids);
+            if (isset($this->input["imagePath"]))
+                $this->input["idImage"] = $this->saveImage();
             if ($isNew) {
                 $this->input["login"] = $this->getLogin($this->input["name"], $this->input["login"]);
-                writeLog($this->input);
                 if (!empty($this->input["login"])) {
                     $u = new DB('user', 'u');
                     $u->setValuesFields($this->input);
@@ -167,6 +186,7 @@ class User extends Base
             }
 
             if (!empty($ids)) {
+
                 $this->saveUserGroups($ids[0]);
                 $this->saveCustomFields();
             }
