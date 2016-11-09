@@ -46,7 +46,20 @@ class User extends Base
 
     private function getPets()
     {
-        return [];
+        $idUser = $this->input["id"];
+
+        $u = new DB('pet_user', 'pu');
+        $u->select("pu.id, p.id id_pet, pu.name, DATE_FORMAT(pu.birthday, '%d.%m.%Y') birthday, pu.weight, 
+            CONCAT('/', IF(img_fld.name IS NULL, '', CONCAT(img_fld.name, '/')), img.name) image_path");
+        $u->innerJoin('pet p', 'p.id = pu.id_pet');
+        $u->leftJoin('image img', 'pu.id_image = img.id');
+        $u->leftJoin('image_folder img_fld', 'img.id_folder = img_fld.id');
+        $u->where('pu.id_user = ?', $idUser);
+        $u->orderBy('pu.sort');
+        $u->addOrderBy('pu.id');
+        $u->groupBy('pu.id');
+
+        return $this->correctValuesBeforeFetch($u->getList());
     }
 
     private function getCustomFields()
@@ -155,6 +168,32 @@ class User extends Base
         }
     }
 
+    private function savePets()
+    {
+        if (!isset($this->input["pets"]))
+            return true;
+
+        try {
+            $idUser = $this->input["id"];
+            $pets = $this->input["pets"];
+            foreach ($pets as $pet) {
+                $u = new DB('pet_user', 'pu');
+                $pet["idUser"] = $idUser;
+                if (!empty($pet["imagePath"]))
+                    $pet["idImage"] = $this->saveImage($pet["imagePath"]);
+                else $pet["idImage"] = null;
+                $pet["birthday"] = date("Y-m-d", strtotime($pet["birthday"]));
+                $u->setValuesFields($pet);
+                $u->save();
+            }
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удаётся сохранить домашних животных контакта!";
+            throw new Exception($this->error);
+        }
+    }
+
+
     public function save($contact = null)
     {
         try {
@@ -186,9 +225,9 @@ class User extends Base
             }
 
             if (!empty($ids)) {
-
                 $this->saveUserGroups($ids[0]);
                 $this->saveCustomFields();
+                $this->savePets();
             }
             DB::commit();
             $this->info();
