@@ -58,7 +58,7 @@ class Import extends Base
         $filePath = "{$this->dirFiles}/{$fileName}";
         $encoding = $this->input["encodingDef"];
         $separator = $this->input["separatorDef"];
-        $skipCountRows = (int) $this->input["skipCountRows"];
+        $skipCountRows = (int)$this->input["skipCountRows"];
 
         if (($handle = fopen($filePath, "r")) !== false) {
             $r = 0;
@@ -91,10 +91,11 @@ class Import extends Base
         $this->encodingDef = $this->encodingDef == "auto" ? (($ext == "csv") ? "CP1251" : "UTF-8") : $this->encodingDef;
         $this->separatorDef = $this->separatorDef == "auto" ? $this->getSeparator($filePath) : $this->separatorDef;
         $fields = $this->getFields();
+        $skipCountRows = $_POST["skipCountRows"];
         $result["fileImport"] = basename($filePath);
         $result["encodingDef"] = $this->encodingDef;
         $result["separatorDef"] = $this->separatorDef;
-        $result["cols"] = $this->getColsFromCsv($filePath, $fields);
+        $result["cols"] = $this->getColsFromCsv($filePath, $fields, $skipCountRows);
         return $result;
     }
 
@@ -131,20 +132,28 @@ class Import extends Base
         return ",";
     }
 
-    private function getColsFromCsv($file, $fields)
+    private function getColsFromCsv($file, $fields, $skipCountRows)
     {
         $count = 0;
+        $samples = [];
         if (($handle = fopen($file, "r")) !== false) {
             $i = 0;
-            while (($row = fgetcsv($handle, 16000, $this->separatorDef)) !== false && $i++ < $this->maxHeaderRows) {
-                if (count($row) > $count)
+            while (($row = fgetcsv($handle, 16000, $this->separatorDef)) !== false &&
+                $i++ < ($this->maxHeaderRows + $skipCountRows)) {
+                if ($i < $skipCountRows + 1)
+                    continue;
+                if (count($row) > $count) {
                     $count = count($row);
+                    $j = 0;
+                    foreach ($row as $key => $value)
+                        $samples[$j++] = $value;
+                }
             }
         }
         fclose($handle);
         $cols = [];
         for ($i = 0; $i < $count; $i++)
-            $cols[] = ["id" => $i, "title" => "Столбец № {$i}", "fields" => $fields];
+            $cols[] = ["id" => $i, "title" => "Столбец № {$i}", "sample" => $samples[$i], "fields" => $fields];
         return $cols;
     }
 

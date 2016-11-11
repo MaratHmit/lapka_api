@@ -31,6 +31,7 @@ class Notice extends Base
         $triggers = (new Trigger())->fetch();
         $u = new DB("notice_trigger");
         $u->select("id_trigger");
+        $u->where("id_notice = ?", $this->input["id"]);
         $items = $u->getList();
         foreach ($triggers as $trigger) {
             $isChecked = false;
