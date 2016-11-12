@@ -53,6 +53,8 @@ class Base
         if (!empty($this->input["id"]) && empty($this->input["ids"]))
             $this->input["ids"] = array($this->input["id"]);
         $this->isNew = empty($this->input["id"]) && empty($this->input["ids"]);
+        unset($this->input["updatedAt"]);
+        unset($this->input["createdAt"]);
         if (empty($this->tableAlias) && !empty($this->tableName)) {
             $worlds = explode("_", $this->tableName);
             foreach ($worlds as $world)

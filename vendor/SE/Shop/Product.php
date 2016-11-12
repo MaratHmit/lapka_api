@@ -233,11 +233,20 @@ class Product extends Base
                 return true;
 
             $t = new DB("shop_offer", "so");
-            $t->select("so.id_product");
+            $t->select("so.*");
             $t->where("so.{$key} = '?'", $this->input[$key]);
-            $result = $t->fetchOne();
-            if (!empty($result["id_product"]))
-                $this->input["id"] = $result["id_product"];
+            $offers = $t->getList();
+            foreach ($offers as $offer) {
+                if (empty($this->input["id"]) && !empty($offer["idProduct"])) {
+                    $this->input["id"] = $offer["idProduct"];
+                    $this->input["ids"][] = $offer["idProduct"];
+                }
+                if (!empty($this->input["price"]))
+                    $offer["price"] = $this->input["price"];
+                if (!empty($this->input["count"]))
+                    $offer["count"] = $this->input["count"];
+                $this->input["offers"][] = $offer;
+            }
             return $this->save();
         } catch (Exception $e) {
             $this->error = "Не удаётся получить ид. товара по заданному ключу!";
@@ -599,10 +608,15 @@ class Product extends Base
             $article = !empty($this->input["article"]) ? $this->input["article"] : null;
             $idsProducts = $this->input["ids"];
             foreach ($idsProducts as $idProduct) {
-                $offer = ["idProduct" => $idProduct, "article" => $article];
+                $dataOffer = ["idProduct" => $idProduct, "article" => $article];
                 $u = new DB('shop_offer', 'so');
-                $u->setValuesFields($offer);
-                $idOffer = $u->save();
+                $u->setValuesFields($dataOffer);
+                $dataOffer["id"] = $idOffer = $u->save();
+                if (!empty($this->input["price"]))
+                    $dataOffer["price"] = $this->input["price"];
+                if (!empty($this->input["count"]))
+                    $dataOffer["count"] = $this->input["count"];
+                (new Offer($dataOffer))->save(false);
             }
             if ($idType && $idOffer) {
                 $t = new DB("shop_type_feature", "stf");

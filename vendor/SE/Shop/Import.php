@@ -3,12 +3,12 @@
 namespace SE\Shop;
 
 use SE\DB as DB;
-use SE\Exception;
 
 class Import extends Base
 {
     private $encodingDef;
     private $separatorDef;
+    private $idProfile;
     private $dirFiles;
     private $maxHeaderRows = 25;
     private $maxCountRows = 100000;
@@ -82,8 +82,28 @@ class Import extends Base
         fclose($handle);
     }
 
+    public function save()
+    {
+        $data["name"] = $this->input["profileName"];
+        $settings["separator"] = $this->input["separator"];
+        $settings["encoding"] = $this->input["encoding"];
+        $settings["skipCountRows"] = $this->input["skipCountRows"];
+        $settings["keyField"] = $this->input["keyField"];
+        $settings["folderImages"] = $this->input["folderImages"];
+        if (!empty($this->input["cols"])) {
+            $cols = [];
+            foreach ($this->input["cols"] as $col)
+                if (!empty($col["code"]))
+                    $cols[$col["id"]] = $col["code"];
+            $settings["cols"] = $cols;
+        }
+        $data["settings"] = json_encode($settings);
+        return (new ImportProfile($data))->saveByName();
+    }
+
     private function getFileSettings($fileName)
     {
+        $this->idProfile = $_POST["idProfile"];
         $filePath = "{$this->dirFiles}/{$fileName}";
         $ext = end(explode(".", $fileName));
         if ($ext != "csv")
@@ -96,6 +116,8 @@ class Import extends Base
         $result["encodingDef"] = $this->encodingDef;
         $result["separatorDef"] = $this->separatorDef;
         $result["cols"] = $this->getColsFromCsv($filePath, $fields, $skipCountRows);
+        if ($this->idProfile)
+            $result["cols"] = $this->setDefaultColsByProfile($this->idProfile, $result["cols"]);
         return $result;
     }
 
@@ -121,6 +143,8 @@ class Import extends Base
             $buffer = fgets($handle, 4096);
         }
         fclose($handle);
+        if (empty($buffer))
+            $buffer = file_get_contents($file);
         $countTab = substr_count($buffer, "\t");
         $countSemicolon = substr_count($buffer, ";");
         $countComma = substr_count($buffer, ",");
@@ -190,5 +214,20 @@ class Import extends Base
         $product->saveByKeyField($this->input["keyField"]);
 
         return true;
+    }
+
+    private function setDefaultColsByProfile($idProfile, $cols)
+    {
+        $result = [];
+        $profile = (new ImportProfile())->info($idProfile);
+        $codes = json_decode($profile["settings"], 1);
+        $codes = $codes["cols"];
+        for ($i = 0; $i < count($cols); $i++) {
+            if (!empty($codes[$i]))
+                $cols[$i]["code"] = $codes[$i];
+            $result[] = $cols[$i];
+        }
+
+        return $result;
     }
 }
