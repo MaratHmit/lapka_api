@@ -319,6 +319,8 @@ class Product extends Base
     {
         if ($this->isNew && !empty($this->input["idGroup"]))
             $this->input["idType"] = $this->getDefaultIdType();
+        if (!empty($this->input["brand"]))
+            $this->input["idBrand"] = (new Brand())->getIdByName($this->input["brand"]);
 
         return true;
     }

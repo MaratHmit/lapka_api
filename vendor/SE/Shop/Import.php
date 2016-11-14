@@ -3,6 +3,7 @@
 namespace SE\Shop;
 
 use SE\DB as DB;
+use SE\Exception;
 
 class Import extends Base
 {
@@ -27,6 +28,7 @@ class Import extends Base
         ["title" => "Остаток", "name" => "count"],
         ["title" => "Вес (гр.)", "name" => "weight"],
         ["title" => "Скидка", "name" => "discount"],
+        ["title" => "Бренд", "name" => "brand"],
         ["title" => "Краткое описание", "name" => "description"],
         ["title" => "Полное описание", "name" => "content"],
         ["title" => "Изображение", "name" => "image"],
@@ -59,6 +61,8 @@ class Import extends Base
         $encoding = $this->input["encodingDef"];
         $separator = $this->input["separatorDef"];
         $skipCountRows = (int)$this->input["skipCountRows"];
+        $countSuccess = 0;
+        $countError = 0;
 
         if (($handle = fopen($filePath, "r")) !== false) {
             $r = 0;
@@ -74,12 +78,17 @@ class Import extends Base
                         }
                         $i++;
                     }
-                    $this->importProduct($product);
+                    if (!empty($this->input["idBrand"]))
+                        $product["idBrand"] = $this->input["idBrand"];
+                    if (!empty($product[$this->input["keyField"]]))
+                        $this->importProduct($product) ? $countSuccess++ : $countError++;
                 }
                 $r++;
             }
         }
         fclose($handle);
+        $this->result["countSuccess"] = $countSuccess;
+        $this->result["countError"] = $countError;
     }
 
     public function save()
@@ -89,7 +98,12 @@ class Import extends Base
         $settings["encoding"] = $this->input["encoding"];
         $settings["skipCountRows"] = $this->input["skipCountRows"];
         $settings["keyField"] = $this->input["keyField"];
-        $settings["folderImages"] = $this->input["folderImages"];
+        if (!empty($this->input["folderImages"]))
+            $settings["folderImages"] = $this->input["folderImages"];
+        if (!empty($this->input["idBrand"]))
+            $settings["idBrand"] = $this->input["idBrand"];
+        if (!empty($this->input["idGroup"]))
+            $settings["idGroup"] = $this->input["idGroup"];
         if (!empty($this->input["cols"])) {
             $cols = [];
             foreach ($this->input["cols"] as $col)
@@ -210,10 +224,13 @@ class Import extends Base
         if (!$productData)
             return false;
 
-        $product = new Product($productData);
-        $product->saveByKeyField($this->input["keyField"]);
-
-        return true;
+        try {
+            $product = new Product($productData);
+            $product->saveByKeyField($this->input["keyField"]);
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
     }
 
     private function setDefaultColsByProfile($idProfile, $cols)
