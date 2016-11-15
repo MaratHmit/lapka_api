@@ -24,7 +24,6 @@ class Import extends Base
         ["title" => "Артикул", "name" => "article"],
         ["title" => "Название товара", "name" => "name"],
         ["title" => "Цена продажи", "name" => "price"],
-        ["title" => "Цена закупки", "name" => "pricePurchase"],
         ["title" => "Остаток", "name" => "count"],
         ["title" => "Вес (гр.)", "name" => "weight"],
         ["title" => "Скидка", "name" => "discount"],
@@ -61,6 +60,7 @@ class Import extends Base
         $encoding = $this->input["encodingDef"];
         $separator = $this->input["separatorDef"];
         $skipCountRows = (int)$this->input["skipCountRows"];
+        $folderImages = trim($this->input["folderImages"], "/");
         $countSuccess = 0;
         $countError = 0;
 
@@ -80,6 +80,15 @@ class Import extends Base
                     }
                     if (!empty($this->input["idBrand"]))
                         $product["idBrand"] = $this->input["idBrand"];
+                    if (!empty($product["image"])) {
+                        if (!empty($product["name"])) {
+                            $image["alt"] = $product["name"];
+                            $image["title"] = $product["name"];
+                        }
+                        $image["imagePath"] = $folderImages . "/" . $product["image"];
+                        $image["isMain"] = true;
+                        $product["images"][] = $image;
+                    }
                     if (!empty($product[$this->input["keyField"]]))
                         $this->importProduct($product) ? $countSuccess++ : $countError++;
                 }
@@ -226,7 +235,7 @@ class Import extends Base
 
         try {
             $product = new Product($productData);
-            $product->saveByKeyField($this->input["keyField"]);
+            $product->importByKeyField($this->input["keyField"]);
             return true;
         } catch (Exception $e) {
             return false;

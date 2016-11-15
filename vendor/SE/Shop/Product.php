@@ -12,9 +12,11 @@ class Product extends Base
     protected function getSettingsFetch()
     {
         return [
-            "select" => 'sp.*, tr.name name, so.article article,
+            "select" => 'sp.*, tr.available_info available_info,
+                tr.name name, so.article article,
                 sop.value price, sbt.name name_brand, sgt.name name_group,
-                CONCAT(f.name, "/", img.name) image_path, spg.id_group id_group',
+                CONCAT(f.name, "/", img.name) image_path, spg.id_group id_group,
+                SUM(sws.value) count',
             "joins" => [
                 [
                     "type" => "left",
@@ -30,6 +32,11 @@ class Product extends Base
                     "type" => "left",
                     "table" => 'shop_offer so',
                     "condition" => "so.id_product = sp.id"
+                ],
+                [
+                    "type" => "left",
+                    "table" => 'shop_warehouse_stock sws',
+                    "condition" => "sws.id_offer = so.id"
                 ],
                 [
                     "type" => "left",
@@ -223,7 +230,7 @@ class Product extends Base
         return (new Discount())->fetchByIdProduct($idProduct ? $idProduct : $this->input["id"]);
     }
 
-    public function saveByKeyField($key)
+    public function importByKeyField($key)
     {
         if (empty($key))
             $key = "article";
@@ -247,11 +254,31 @@ class Product extends Base
                     $offer["count"] = $this->input["count"];
                 $this->input["offers"][] = $offer;
             }
+            if (!empty($this->input["id"]) && !empty($this->input["images"])) {
+                foreach ($this->input["images"] as &$image) {
+                    $idProduct = $this->input["id"];
+                    $idImage = $this->saveImage($image["imagePath"]);
+                    $t = new DB("shop_product_image", "spi");
+                    $t->select("spi.id");
+                    $t->where("id_product = {$idProduct} AND id_image = {$idImage}");
+                    $result = $t->fetchOne();
+                    if (!empty($result["id"]))
+                        $image["id"] = $result["id"];
+                }
+            }
             return $this->save();
         } catch (Exception $e) {
             $this->error = "Не удаётся получить ид. товара по заданному ключу!";
             throw new Exception($this->error);
         }
+    }
+
+    protected function correctValuesBeforeFetch($items = [])
+    {
+        $items = parent::correctValuesBeforeFetch($items);
+        foreach ($items as &$item)
+            $item["countDisplay"] = $item["isUnlimited"] ? $item["availableInfo"] : (float) $item["count"];
+        return $items;
     }
 
     protected function getAddInfo()
@@ -331,7 +358,7 @@ class Product extends Base
             return false;
 
         return $this->createDefaultOffer() && $this->saveListImages() && $this->saveGroups() &&
-            $this->saveOffers();
+        $this->saveOffers();
     }
 
     private function getDefaultIdType()

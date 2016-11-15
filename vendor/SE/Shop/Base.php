@@ -325,14 +325,14 @@ class Base
         }
         return $result["id"];
     }
-    
+
     public function saveListImages($tableImages = null, $fieldLinkName = null)
     {
         $tableImages = empty($tableName) ? $this->tableName . "_image" : $tableImages;
         $images = $this->input["images"];
         if (!isset($images) || !DB::existTable($tableImages))
             return true;
-        
+
         try {
             if (empty($fieldLinkName)) {
                 $t = new DB("{$tableImages}");
@@ -380,7 +380,7 @@ class Base
                     foreach ($idsItems as $idItem) {
                         if ($idImage = $this->saveImage($image["imagePath"]))
                             $data[] = ["{$fieldLinkName}" => $idItem, 'id_image' => $idImage, 'sort' => (int)$image["sort"],
-                                'is_main' => isset($image["isMain"]) ? (bool) $image["isMain"] : !$i++];
+                                'is_main' => isset($image["isMain"]) ? (bool)$image["isMain"] : !$i++];
                         $dataTranslate[] = ['id_image' => $idImage, 'id_lang' => $this->idLang,
                             'title' => $image["title"], 'alt' => $image["alt"]];
                     }
