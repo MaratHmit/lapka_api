@@ -39,8 +39,8 @@ $origin = !empty($headers['Origin']) ? $headers['Origin'] : $headers['origin'];
 if (!empty($origin)) {
     $url = parse_url($origin);
     if ($url) {
-        if ($url['host'] == 'shop.siteedit24.com')
-            header("Access-Control-Allow-Origin: http://shop.siteedit24.com");
+        if ($url['host'] == 'lapka.e-stile.ru')
+            header("Access-Control-Allow-Origin: http://lapka.e-stile.ru");
         if ($url['host'] == 'localhost' && $url['port'] == 1338)
             header("Access-Control-Allow-Origin: http://localhost:1338");
         header("Access-Control-Allow-Credentials: true");

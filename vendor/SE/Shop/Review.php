@@ -9,7 +9,8 @@ class Review extends Base
     protected function getSettingsFetch()
     {
         return array(
-            "select" => 'sr.*, sp_tr.name name_product, u.name name_user',
+            "select" => 'sr.*, sp_tr.name product_name, u.name user_name,
+                DATE_FORMAT(sr.date, "%d.%m.%Y %H:%i") date_display',
             "joins" => array(
                 array(
                     "type" => "inner",
@@ -37,6 +38,12 @@ class Review extends Base
 
         $this->setFilters(array("field" => "idProduct", "value" => $idProduct));
         return $this->fetch();
+    }
+
+    protected function correctValuesBeforeSave()
+    {
+        if (!empty($this->input["date"]))
+            $this->input["date"] = date("Y-m-d H:i:s", strtotime($this->input["date"]));
     }
 
 }

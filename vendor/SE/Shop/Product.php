@@ -52,7 +52,6 @@ class Product extends Base
                     "type" => "left",
                     "table" => 'shop_product_group spg',
                     "condition" => "spg.id_product = sp.id"
-
                 ],
                 [
                     "type" => "left",
@@ -143,8 +142,8 @@ class Product extends Base
 
         try {
             $u = new DB('shop_product_feature', 'spf');
-            $u->select('sfg.id id_group, sfg_tr.name group_name, sf_tr.name,
-						sf.type, spf.value, sfv.color, sfg.sort index_group');
+            $u->select('spf.id, sfg.id id_group, sfg_tr.name group_name, sf.id id_feature, sf_tr.name,
+						sf.type, spf.id_value, spf.value, sfv.color, sfg.sort index_group');
             $u->innerJoin('shop_feature sf', 'sf.id = spf.id_feature');
             $u->innerJoin('shop_feature_translate sf_tr', 'sf_tr.id_feature = sf.id');
             $u->leftJoin('shop_feature_value sfv', 'sfv.id = spf.id_value');
@@ -178,7 +177,7 @@ class Product extends Base
         $u = new DB('shop_product_translate', 'spt');
         $u->select('spt.id_product id, spt.name');
         $u->innerJoin('shop_product_related spr', 'spt.id_product = spr.id_product OR spt.id_product = spr.id_related');
-        $u->where('`type` = 2');
+        $u->where('`type` = 2 AND (spr.id_product = ? OR spr.id_related = ?) AND spt.id_product <> ?', $id);
         return $u->getList();
     }
 
@@ -192,7 +191,7 @@ class Product extends Base
         $u = new DB('shop_product_translate', 'spt');
         $u->select('spt.id_product id, spt.name');
         $u->innerJoin('shop_product_related spr', 'spt.id_product = spr.id_product');
-        $u->where('`type` = 1');
+        $u->where('`type` = 1 AND spt.id_product = ?', $id);
         return $u->getList();
     }
 
@@ -230,7 +229,7 @@ class Product extends Base
         return (new Discount())->fetchByIdProduct($idProduct ? $idProduct : $this->input["id"]);
     }
 
-    public function importByKeyField($key)
+    public function saveByKeyField($key)
     {
         if (empty($key))
             $key = "article";
@@ -240,38 +239,18 @@ class Product extends Base
                 return true;
 
             $t = new DB("shop_offer", "so");
-            $t->select("so.*");
+            $t->select("so.id_product");
             $t->where("so.{$key} = '?'", $this->input[$key]);
-            $offers = $t->getList();
-            foreach ($offers as $offer) {
-                if (empty($this->input["id"]) && !empty($offer["idProduct"])) {
-                    $this->input["id"] = $offer["idProduct"];
-                    $this->input["ids"][] = $offer["idProduct"];
-                }
-                if (!empty($this->input["price"]))
-                    $offer["price"] = $this->input["price"];
-                if (!empty($this->input["count"]))
-                    $offer["count"] = $this->input["count"];
-                $this->input["offers"][] = $offer;
-            }
-            if (!empty($this->input["id"]) && !empty($this->input["images"])) {
-                foreach ($this->input["images"] as &$image) {
-                    $idProduct = $this->input["id"];
-                    $idImage = $this->saveImage($image["imagePath"]);
-                    $t = new DB("shop_product_image", "spi");
-                    $t->select("spi.id");
-                    $t->where("id_product = {$idProduct} AND id_image = {$idImage}");
-                    $result = $t->fetchOne();
-                    if (!empty($result["id"]))
-                        $image["id"] = $result["id"];
-                }
-            }
+            $result = $t->fetchOne();
+            if (!empty($result["id_product"]))
+                $this->input["id"] = $result["id_product"];
             return $this->save();
         } catch (Exception $e) {
             $this->error = "Не удаётся получить ид. товара по заданному ключу!";
             throw new Exception($this->error);
         }
     }
+
 
     protected function correctValuesBeforeFetch($items = [])
     {
@@ -346,8 +325,6 @@ class Product extends Base
     {
         if ($this->isNew && !empty($this->input["idGroup"]))
             $this->input["idType"] = $this->getDefaultIdType();
-        if (!empty($this->input["brand"]))
-            $this->input["idBrand"] = (new Brand())->getIdByName($this->input["brand"]);
 
         return true;
     }
@@ -358,7 +335,8 @@ class Product extends Base
             return false;
 
         return $this->createDefaultOffer() && $this->saveListImages() && $this->saveGroups() &&
-        $this->saveOffers();
+        $this->saveOffers() && $this->saveSpecifications() && $this->saveAccompanyingProducts() &&
+        $this->saveSimilarProducts() && $this->saveComments() && $this->saveReviews();
     }
 
     private function getDefaultIdType()
@@ -381,51 +359,15 @@ class Product extends Base
 
         try {
             $idsProducts = $this->input["ids"];
-            $isAddSpecifications = $this->input["isAddSpecifications"];
             $specifications = $this->input["specifications"];
-            $idsStr = implode(",", $idsProducts);
-            if (!$isAddSpecifications) {
-                $u = new DB('shop_modifications_feature', 'smf');
-                $u->where('id_modification IS NULL AND id_price IN (?)', $idsStr)->deleteList();
-            }
-
-            $m = new DB('shop_modifications_feature', 'smf');
-            $m->select('id');
-            foreach ($specifications as $specification) {
-                foreach ($idsProducts as $idProduct) {
-                    if ($isAddSpecifications) {
-                        if (is_string($specification["valueString"]))
-                            $m->where("id_price = {$idProduct} AND id_feature = {$specification["idFeature"]} AND 
-							           value_string = '{$specification["valueString"]}'");
-                        if (is_bool($specification["valueBool"]))
-                            $m->where("id_price = {$idProduct} AND id_feature = {$specification["idFeature"]} AND 
-							           value_bool = '{$specification["valueBool"]}'");
-                        if (is_numeric($specification["valueNumber"]))
-                            $m->where("id_price = {$idProduct} AND id_feature = {$specification["idFeature"]} AND 
-							           value_number = '{$specification["valueNumber"]}'");
-                        if (is_numeric($specification["idValue"]))
-                            $m->where("id_price = {$idProduct} AND id_feature = {$specification["idFeature"]} AND 
-									   id_value = {$specification["idValue"]}");
-                        $result = $m->fetchOne();
-                        if ($result["id"])
-                            continue;
-                    }
-                    if ($specification["type"] == "number")
-                        $specification["valueNumber"] = $specification["value"];
-                    elseif ($specification["type"] == "string")
-                        $specification["valueString"] = $specification["value"];
-                    elseif ($specification["type"] == "bool")
-                        $specification["valueBool"] = $specification["value"];
-                    elseif (empty($specification["idValue"]))
-                        continue;
-                    $data[] = array('id_price' => $idProduct, 'id_feature' => $specification["idFeature"],
-                        'id_value' => $specification["idValue"],
-                        'value_number' => $specification["valueNumber"],
-                        'value_bool' => $specification["valueBool"], 'value_string' => $specification["valueString"]);
+            foreach ($idsProducts as $idProduct) {
+                foreach ($specifications as $specification) {
+                    $specification["idProduct"] = $idProduct;
+                    $u = new DB('shop_product_feature');
+                    $u->setValuesFields($specification);
+                    $u->save();
                 }
             }
-            if (!empty($data))
-                DB::insertList('shop_modifications_feature', $data);
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить спецификации товара!";
@@ -439,38 +381,9 @@ class Product extends Base
             return true;
 
         try {
-            $idsProducts = $this->input["ids"];
-            $products = $this->input["similarProducts"];
-            $idsExists = array();
-            foreach ($products as $p)
-                if ($p["id"])
-                    $idsExists[] = $p["id"];
-            $idsExists = array_diff($idsExists, $idsProducts);
-            $idsExistsStr = implode(",", $idsExists);
-            $idsStr = implode(",", $idsProducts);
-            $u = new DB('shop_sameprice', 'ss');
-            if ($idsExistsStr)
-                $u->where("((NOT id_acc IN ({$idsExistsStr})) AND id_price IN (?)) OR 
-                           ((NOT id_price IN ({$idsExistsStr})) AND id_acc IN (?))", $idsStr)->deleteList();
-            else $u->where('id_price IN (?) OR id_acc IN (?)', $idsStr)->deleteList();
-            $idsExists = array();
-            if ($idsExistsStr) {
-                $u->select("id_price, id_acc");
-                $u->where("((id_acc IN ({$idsExistsStr})) AND id_price IN (?)) OR 
-                            ((id_price IN ({$idsExistsStr})) AND id_acc IN (?))", $idsStr);
-                $objects = $u->getList();
-                foreach ($objects as $item) {
-                    $idsExists[] = $item["idAcc"];
-                    $idsExists[] = $item["idPrice"];
-                }
-            };
-            $data = array();
-            foreach ($products as $p)
-                if (empty($idsExists) || !in_array($p["id"], $idsExists))
-                    foreach ($idsProducts as $idProduct)
-                        $data[] = array('id_price' => $idProduct, 'id_acc' => $p["id"]);
-            if (!empty($data))
-                DB::insertList('shop_sameprice', $data);
+            foreach ($this->input["ids"] as $id)
+                DB::saveManyToMany($id, $this->input["similarProducts"],
+                    array("table" => "shop_product_related", "key" => "id_product", "link" => "id_related"));
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить похожие товары!";
@@ -484,9 +397,7 @@ class Product extends Base
             return true;
 
         try {
-            foreach ($this->input["ids"] as $id)
-                DB::saveManyToMany($id, $this->input["accompanyingProducts"],
-                    array("table" => "shop_accomp", "key" => "id_price", "link" => "id_acc"));
+
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить сопутствующие товары!";
@@ -503,22 +414,23 @@ class Product extends Base
             $idsProducts = $this->input["ids"];
             $comments = $this->input["comments"];
             $idsStr = implode(",", $idsProducts);
-            $u = new DB('shop_comm', 'sc');
-            $u->where('id_price IN (?)', $idsStr)->deleteList();
-            foreach ($comments as $c) {
-                $showing = 'N';
-                $isActive = 'N';
-                if ($c["isShowing"])
-                    $showing = 'Y';
-                if ($c["isActive"])
-                    $isActive = 'Y';
-                foreach ($idsProducts as $idProduct)
-                    $data[] = array('id_price' => $idProduct, 'date' => $c["date"], 'name' => $c["name"],
-                        'email' => $c["email"], 'commentary' => $c["commentary"], 'response' => $c["response"],
-                        'showing' => $showing, 'is_active' => $isActive);
+            $idsExists = array();
+            foreach ($comments as $comment)
+                if ($comment["id"])
+                    $idsExists[] = $comment["id"];
+            $idsExists = implode(",", $idsExists);
+            $u = new DB('shop_commentary');
+            if (!$idsExists)
+                $u->where('id_product IN (?)', $idsStr)->deleteList();
+            else $u->where("NOT id IN ({$idsExists}) AND id_product IN (?)", $idsStr)->deleteList();
+            foreach ($comments as $comment) {
+                foreach ($idsProducts as $idProduct) {
+                    $comment["idProduct"] = $idProduct;
+                    $u = new DB('shop_reviews');
+                    $u->setValuesFields($comment);
+                    $u->save();
+                }
             }
-            if (!empty($data))
-                DB::insertList('shop_comm', $data);
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить комментарии товара!";
@@ -540,14 +452,14 @@ class Product extends Base
                 if ($review["id"])
                     $idsExists[] = $review["id"];
             $idsExists = implode(",", $idsExists);
-            $u = new DB('shop_reviews');
+            $u = new DB('shop_review');
             if (!$idsExists)
-                $u->where('id_price IN (?)', $idsStr)->deleteList();
-            else $u->where("NOT id IN ({$idsExists}) AND id_price IN (?)", $idsStr)->deleteList();
+                $u->where('id_product IN (?)', $idsStr)->deleteList();
+            else $u->where("NOT id IN ({$idsExists}) AND id_product IN (?)", $idsStr)->deleteList();
             foreach ($reviews as $review) {
                 foreach ($idsProducts as $idProduct) {
-                    $review["idPrice"] = $idProduct;
-                    $u = new DB('shop_reviews');
+                    $review["idProduct"] = $idProduct;
+                    $u = new DB('shop_review');
                     $u->setValuesFields($review);
                     $u->save();
                 }
@@ -577,7 +489,7 @@ class Product extends Base
 
     private function saveGroups()
     {
-        if ($this->isNew && !empty($this->input["idGroup"]) && !isset($this->input["groups"]))
+        if (!empty($this->input["idGroup"]) && !isset($this->input["groups"]))
             $this->input["groups"][] = ["id" => $this->input["idGroup"]];
         if (!isset($this->input["groups"]))
             return true;
@@ -637,15 +549,10 @@ class Product extends Base
             $article = !empty($this->input["article"]) ? $this->input["article"] : null;
             $idsProducts = $this->input["ids"];
             foreach ($idsProducts as $idProduct) {
-                $dataOffer = ["idProduct" => $idProduct, "article" => $article];
+                $offer = ["idProduct" => $idProduct, "article" => $article];
                 $u = new DB('shop_offer', 'so');
-                $u->setValuesFields($dataOffer);
-                $dataOffer["id"] = $idOffer = $u->save();
-                if (!empty($this->input["price"]))
-                    $dataOffer["price"] = $this->input["price"];
-                if (!empty($this->input["count"]))
-                    $dataOffer["count"] = $this->input["count"];
-                (new Offer($dataOffer))->save(false);
+                $u->setValuesFields($offer);
+                $idOffer = $u->save();
             }
             if ($idType && $idOffer) {
                 $t = new DB("shop_type_feature", "stf");
