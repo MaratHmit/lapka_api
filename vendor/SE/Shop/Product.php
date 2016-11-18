@@ -229,6 +229,26 @@ class Product extends Base
         return (new Discount())->fetchByIdProduct($idProduct ? $idProduct : $this->input["id"]);
     }
 
+    public function getLabels($idProduct = null)
+    {
+        $idProduct = $idProduct ? $idProduct : $this->input["id"];
+        $result = [];
+        $labels = (new Label())->fetch();
+        $u = new DB("shop_label_product");
+        $u->select("id_label");
+        $u->where("id_product = ?", $idProduct);
+        $items = $u->getList();
+        foreach ($labels as $label) {
+            $isChecked = false;
+            foreach ($items as $item)
+                if ($isChecked = ($label["id"] == $item["idLabel"]))
+                    break;
+            $label["isChecked"] = $isChecked;
+            $result[] = $label;
+        }
+        return $result;
+    }
+
     public function saveByKeyField($key)
     {
         if (empty($key))
@@ -251,12 +271,12 @@ class Product extends Base
         }
     }
 
-
     protected function correctValuesBeforeFetch($items = [])
     {
         $items = parent::correctValuesBeforeFetch($items);
-        foreach ($items as &$item)
-            $item["countDisplay"] = $item["isUnlimited"] ? $item["availableInfo"] : (float) $item["count"];
+        foreach ($items as &$item) {
+            $item["countDisplay"] = $item["isUnlimited"] ? $item["availableInfo"] : (float)$item["count"];
+        }
         return $items;
     }
 
@@ -274,6 +294,7 @@ class Product extends Base
         $result["discounts"] = $this->getDiscounts();
         $result["measures"] = (new Measure())->fetch();
         $result["productTypes"] = (new ProductType())->fetch();
+        $result["labels"] = $this->getLabels();
         return $result;
     }
 
@@ -336,7 +357,7 @@ class Product extends Base
 
         return $this->createDefaultOffer() && $this->saveListImages() && $this->saveGroups() &&
         $this->saveOffers() && $this->saveSpecifications() && $this->saveAccompanyingProducts() &&
-        $this->saveSimilarProducts() && $this->saveComments() && $this->saveReviews();
+        $this->saveSimilarProducts() && $this->saveComments() && $this->saveReviews() && $this->saveLabels();
     }
 
     private function getDefaultIdType()
@@ -608,6 +629,24 @@ class Product extends Base
             $this->error = "Не удаётся сохранить параметры товара!";
         }
         return false;
+    }
+
+    private function saveLabels()
+    {
+        $labels = $this->input["labels"];
+        $labelsNew = [];
+        foreach ($labels as $label)
+            if ($label["isChecked"])
+                $labelsNew[] = $label;
+        try {
+            foreach ($this->input["ids"] as $id)
+                DB::saveManyToMany($id, $labelsNew,
+                    array("table" => "shop_label_product", "key" => "id_product", "link" => "id_label"));
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удаётся сохранить ярлыки товара!";
+            throw new Exception($this->error);
+        }
     }
 
 }
