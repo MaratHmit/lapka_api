@@ -205,6 +205,29 @@ class Category extends Base
         return $result;
     }
 
+    private function getFoods()
+    {
+        $result = [];
+        $pets = (new Pet())->fetch();
+        $u = new DB("pet_food_portion", "pfp");
+        $u->select("pfp.*");
+        $u->where("id_group = ?", $this->input["id"]);
+        $items = $u->getList();
+        foreach ($pets as $pet) {
+            $petFood = [];
+            foreach ($items as $item)
+                if ($pet["id"] == $item["idPet"]) {
+                    $petFood["id"] = $item["id"];
+                    $petFood["portion"] = $item["portion"];
+                    break;
+                }
+            $petFood["name"] = $pet["name"];
+            $petFood["idPet"] = $pet["id"];
+            $result[] = $petFood;
+        }
+        return $result;
+    }
+
     private function getNameParent()
     {
         if (!$this->result["idParent"])
@@ -225,6 +248,7 @@ class Category extends Base
         $result["deliveries"] = $this->getDeliveries();
         $result["childs"] = $this->getChilds();
         $result["productTypes"] = (new ProductType())->fetch();
+        $result["foods"] = $this->getFoods();
         return $result;
     }
 
@@ -311,11 +335,32 @@ class Category extends Base
         $this->saveDiscounts();
         $this->saveListImages();
         $this->saveChilds();
+        $this->saveFoods();
 
         $group = (new Category($this->input))->info();
         if ($this->isNew || ($group["idParent"] != $this->input["idParent"]))
             self::saveIdParent($this->input["id"], $this->input["idParent"]);
 
         return true;
+    }
+
+    private function saveFoods()
+    {
+        try {
+            $foods = $this->input["foods"];
+            foreach ($foods as $food) {
+                if (empty($food["id"]) && empty($food["portion"]))
+                    continue;
+                $food["idGroup"] = $this->input["id"];
+                $t = new DB("pet_food_portion");
+                $t->setValuesFields($food);
+                $t->save();
+            }
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удается сохранить порции корма!";
+            throw new Exception($this->error);
+        }
+
     }
 }
