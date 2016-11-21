@@ -249,7 +249,7 @@ class Product extends Base
         return $result;
     }
 
-    public function saveByKeyField($key)
+    public function importByKeyField($key)
     {
         if (empty($key))
             $key = "article";
@@ -259,11 +259,34 @@ class Product extends Base
                 return true;
 
             $t = new DB("shop_offer", "so");
-            $t->select("so.id_product");
+            $t->select("so.*");
             $t->where("so.{$key} = '?'", $this->input[$key]);
-            $result = $t->fetchOne();
-            if (!empty($result["id_product"]))
-                $this->input["id"] = $result["id_product"];
+            $offers = $t->getList();
+            foreach ($offers as $offer) {
+                if (empty($this->input["id"]) && !empty($offer["idProduct"])) {
+                    $this->input["id"] = $offer["idProduct"];
+                    $this->input["ids"][] = $offer["idProduct"];
+                }
+                if (!empty($this->input["price"]))
+                    $offer["price"] = $this->input["price"];
+                if (!empty($this->input["count"]))
+                    $offer["count"] = $this->input["count"];
+                $this->input["offers"][] = $offer;
+            }
+            if (!empty($this->input["id"]) && !empty($this->input["images"])) {
+                foreach ($this->input["images"] as &$image) {
+                    $idProduct = $this->input["id"];
+                    $idImage = $this->saveImage($image["imagePath"]);
+                    $t = new DB("shop_product_image", "spi");
+                    $t->select("spi.id");
+                    $t->where("id_product = {$idProduct} AND id_image = {$idImage}");
+                    $result = $t->fetchOne();
+                    if (!empty($result["id"]))
+                        $image["id"] = $result["id"];
+                }
+            }
+            if (empty($this->input["idGroup"]) && !empty($this->input["catalog0"]))
+                $this->input["idGroup"] = Category::getIdGroupByColumns($this->input);
             return $this->save();
         } catch (Exception $e) {
             $this->error = "Не удаётся получить ид. товара по заданному ключу!";
@@ -346,6 +369,8 @@ class Product extends Base
     {
         if ($this->isNew && !empty($this->input["idGroup"]))
             $this->input["idType"] = $this->getDefaultIdType();
+        if (!empty($this->input["brand"]))
+            $this->input["idBrand"] = (new Brand())->getIdByName($this->input["brand"]);
 
         return true;
     }
@@ -535,7 +560,7 @@ class Product extends Base
                 $u->andWhere("NOT id_group IN (?)", $idsGroupsStr);
             $u->deleteList();
             if (!empty($data))
-                DB::insertList('shop_product_group', $data);
+                DB::insertList('shop_product_group', $data, true);
             foreach ($idsProducts as $idProduct) {
                 $i = 0;
                 foreach ($groups as $group) {
@@ -570,10 +595,15 @@ class Product extends Base
             $article = !empty($this->input["article"]) ? $this->input["article"] : null;
             $idsProducts = $this->input["ids"];
             foreach ($idsProducts as $idProduct) {
-                $offer = ["idProduct" => $idProduct, "article" => $article];
+                $dataOffer = ["idProduct" => $idProduct, "article" => $article];
                 $u = new DB('shop_offer', 'so');
-                $u->setValuesFields($offer);
-                $idOffer = $u->save();
+                $u->setValuesFields($dataOffer);
+                $dataOffer["id"] = $idOffer = $u->save();
+                if (!empty($this->input["price"]))
+                    $dataOffer["price"] = $this->input["price"];
+                if (!empty($this->input["count"]))
+                    $dataOffer["count"] = $this->input["count"];
+                (new Offer($dataOffer))->save(false);
             }
             if ($idType && $idOffer) {
                 $t = new DB("shop_type_feature", "stf");
@@ -645,6 +675,85 @@ class Product extends Base
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить ярлыки товара!";
+            throw new Exception($this->error);
+        }
+    }
+
+
+    private function getGroup53($groups, $idGroup)
+    {
+        if (!$idGroup)
+            return null;
+
+        foreach ($groups as $group) {
+            if ($group["id"] == $idGroup)
+                return $group["name"];
+        }
+        return null;
+    }
+
+    public function export()
+    {
+        $fileName = "export_products.csv";
+        $filePath = DOCUMENT_ROOT . "/files";
+        if (!file_exists($filePath) || !is_dir($filePath))
+            mkdir($filePath);
+        $filePath .= "/{$fileName}";
+        $urlFile = 'http://' . HOSTNAME . "/files/{$fileName}";
+
+        $limit = 1000;
+        $offset = 0;
+        $countColumns = 3;
+        $columns = [];
+
+        try {
+            $stmt = DB::query("SELECT sg.id
+                  FROM `shop_group` `sg` 
+                  LEFT JOIN shop_group_translate tr ON sg.id = tr.id_group 
+                  LEFT JOIN shop_group_tree sgt ON sgt.id_child = sg.id AND sg.id <> sgt.id_parent 
+                  LEFT JOIN shop_group_tree sgtp ON sgtp.id_child = sgt.id_parent 
+                  WHERE NOT sg.id IN (SELECT sgt1.id_parent FROM shop_group_tree sgt1 WHERE sgt1.id_child <> sgt1.id_parent)
+                  GROUP BY sg.id 
+                  ORDER BY sg.id");
+            $stmt->setFetchMode(\PDO::FETCH_ASSOC);
+            $items = $stmt->fetchAll();
+            $groups = (new Category())->fetch();
+            foreach ($items as &$item) {
+                foreach ($groups as $group)
+                    if ($group["id"] == $item["id"]) {
+                        $item["path"] = $group["name"];
+                        $path = explode(" | ", $group["name"]);
+                        for ($i = 0; $i < $countColumns; $i++)
+                            $item["catalog" . $i] = trim($path[$i]);
+                        break;
+                    }
+            }
+            if (count($items)) {
+                $fp = fopen($filePath, 'w');
+                $header = array_keys($items[0]);
+                $headerCSV = [];
+                foreach ($header as $col) {
+                    $col = iconv('utf-8', 'CP1251', $col);
+                    $headerCSV[] = $col;
+                }
+                fputcsv($fp, $headerCSV, ";");
+
+                foreach ($items as $row) {
+                    $out = [];
+                    foreach ($row as $key => $r)
+                        $out[] = iconv('utf-8', 'CP1251', $r);
+                    fputcsv($fp, $out, ";");
+                }
+
+                fclose($fp);
+            }
+
+            if (file_exists($filePath) && filesize($filePath)) {
+                $this->result['url'] = $urlFile;
+                $this->result['name'] = $fileName;
+            } else throw new Exception();
+        } catch (Exception $e) {
+            $this->error = "Не удаётся экспортировать товары!";
             throw new Exception($this->error);
         }
     }

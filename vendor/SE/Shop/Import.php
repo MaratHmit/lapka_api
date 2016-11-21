@@ -14,6 +14,7 @@ class Import extends Base
     private $maxHeaderRows = 25;
     private $maxCountRows = 100000;
     private $catalogCols = [
+        ["title" => "Ид. категории", "name" => "idGroup"],
         ["title" => "Корневая категория", "name" => "catalog0"],
         ["title" => "Подкатегория 1", "name" => "catalog1"],
         ["title" => "Подкатегория 2", "name" => "catalog2"],

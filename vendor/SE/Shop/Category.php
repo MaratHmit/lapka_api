@@ -13,6 +13,27 @@ class Category extends Base
     protected $limit = null;
     protected $allowedSearch = false;
 
+    public static function getIdGroupByColumns($input = [])
+    {
+        $id = null;
+        $countColumns = 3;
+        $groups = (new Category())->fetch();
+        $path = [];
+        for ($i = 0; $i < $countColumns; $i++) {
+            $columnName = "catalog" . $i;
+            if (!empty($input[$columnName]))
+                $path[] = $input[$columnName];
+            else break;
+        }
+        $path = implode(" | ", $path);
+        foreach ($groups as $group)
+            if (strcmp($group["name"], $path) === 0) {
+                $id = $group["id"];
+                break;
+            }
+        return $id;
+    }
+
     private function getParentItem($item, $items)
     {
         foreach ($items as $it)
@@ -28,7 +49,7 @@ class Category extends Base
         $parent = $this->getParentItem($item, $items);
         if (!$parent)
             return $item["name"];
-        return $this->getPathName($parent, $items) . " / " . $item["name"];
+        return $this->getPathName($parent, $items) . " | " . $item["name"];
     }
 
     public function getPatches($items)
@@ -57,7 +78,7 @@ class Category extends Base
         return $result;
     }
 
-    private function setIdMainParent($items)
+    public function setIdMainParent($items)
     {
         $result = array();
         foreach ($items as $item) {
@@ -318,7 +339,7 @@ class Category extends Base
         $idsChilds = [];
         foreach ($childs as $child)
             $idsChilds[] = $child["id"];
-        $idsNewChilds =  array_diff($idsChilds, $idsOldChilds);
+        $idsNewChilds = array_diff($idsChilds, $idsOldChilds);
         $idsDelChilds = array_diff($idsOldChilds, $idsChilds);
         foreach ($idsNewChilds as $idNewChild)
             self::saveIdParent($idNewChild, $idParent);
