@@ -43,6 +43,11 @@ class Service extends Base
         }
     }
 
+    public function saveUserSettings($email, $groups = [])
+    {
+
+    }
+
     protected function getAddInfo()
     {
         return ["parameters" => $this->getParameters()];

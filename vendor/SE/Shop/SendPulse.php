@@ -70,25 +70,16 @@ class SendPulse extends Base
 
     public function createCampaign($subject, $body, $idBook, $sendDate)
     {
-        $info = (new Main())->info();
-        $senderName = $info["shopname"];
-        $senderEmail = $info["esales"];
-
         $senders = $this->getInstanceSendPulseApi()->listSenders();
-        $isExist = false;
-        $senderEmailDef = null;
+        $senderName = null;
+        $senderEmail = null;
         foreach ($senders as $sender) {
-            $senderEmailDef = empty($senderEmailDef) ? $sender->email : $senderEmailDef;
-            if ($isExist = ($sender->email == $senderEmail))
-                break;
-        }
-        if (!$isExist) {
-            $this->getInstanceSendPulseApi()->addSender($senderName, $senderEmail);
-            $senderEmail = $senderEmailDef;
+            $senderEmail = $sender->email;
+            $senderName = $sender->name;
+            break;
         }
         $this->getInstanceSendPulseApi()->createCampaign($senderName, $senderEmail,
             $subject, $body, $idBook, $sendDate);
-
     }
 
 }

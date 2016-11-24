@@ -136,7 +136,11 @@ class User extends Base
         try {
             DB::saveManyToMany($idUser, $this->input["groups"],
                 array("table" => "user_usergroup", "key" => "id_user", "link" => "id_group"));
-
+            if (!empty($this->input['email'])) {
+                $service = new Service();
+                $service->saveUserSettings($this->input['email'], $this->input["groups"]);
+            }
+            return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить группы контактов!";
             throw new Exception($this->error);
