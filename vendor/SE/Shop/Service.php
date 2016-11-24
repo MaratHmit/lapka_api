@@ -12,6 +12,37 @@ class Service extends Base
     protected $sortBy = "sort";
     protected $sortOrder = "asc";
 
+    public function saveUserGroupSettings($id, $name)
+    {
+        /* SendPulse */
+        try {
+            $sendPulse = new SendPulse();
+            $t = new DB('usergroup_exchange', 'ue');
+            $t->where('ue.id_group = ?', $id);
+            $result = $t->fetchOne();
+            $idExchange = !empty($result["id"]) ? $result["id"] : null;
+            $idBook = !empty($result["idSendpulse"]) ? $result["idSendpulse"] : null;
+            if ($idBook) {
+                $book = $sendPulse->getBookById($idBook);
+                $nameBook = $book[0]->name;
+                if (!empty($nameBook)) {
+                    if ($nameBook != $name)
+                        $sendPulse->editAddressBook($idBook, $name);
+                    return true;
+                }
+            }
+            $idBook = $sendPulse->createAddressBook($name);
+            $data = ["id" => $idExchange, "idGroup" => $id, "idSendpulse" => $idBook];
+            $t = new DB('usergroup_exchange', 'ue');
+            $t->setValuesFields($data);
+            $t->save();
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удается сохранить настройки сервиса для группы!";
+            throw new Exception($this->error);
+        }
+    }
+
     protected function getAddInfo()
     {
         return ["parameters" => $this->getParameters()];

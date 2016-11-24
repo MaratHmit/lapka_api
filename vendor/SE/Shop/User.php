@@ -200,7 +200,6 @@ class User extends Base
             if ($contact)
                 $this->input = $contact;
             DB::beginTransaction();
-            writeLog("ok");
 
             $ids = array();
             if (empty($this->input["ids"]) && !empty($this->input["id"]))

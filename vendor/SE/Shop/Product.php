@@ -382,7 +382,8 @@ class Product extends Base
 
         return $this->createDefaultOffer() && $this->saveListImages() && $this->saveGroups() &&
         $this->saveOffers() && $this->saveSpecifications() && $this->saveAccompanyingProducts() &&
-        $this->saveSimilarProducts() && $this->saveComments() && $this->saveReviews() && $this->saveLabels();
+        $this->saveSimilarProducts() && $this->saveComments() && $this->saveReviews() && $this->saveLabels() &&
+            $this->saveDiscounts();
     }
 
     private function getDefaultIdType()
@@ -525,7 +526,7 @@ class Product extends Base
         try {
             foreach ($this->input["ids"] as $id)
                 DB::saveManyToMany($id, $this->input["discounts"],
-                    array("table" => "shop_discount_links", "key" => "id_price", "link" => "discount_id"));
+                    array("table" => "shop_discount_link", "key" => "id_product", "link" => "id_discount"));
             return true;
         } catch (Exception $e) {
             $this->error = "Не удаётся сохранить скидки товара!";
