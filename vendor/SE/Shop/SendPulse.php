@@ -68,18 +68,21 @@ class SendPulse extends Base
         $this->getInstanceSendPulseApi()->removeEmailFromAllBooks($email);
     }
 
-    public function createCampaign($subject, $body, $idBook, $sendDate)
+    public function deleteCampaign($idCampaign)
+    {
+        $this->getInstanceSendPulseApi()->cancelCampaign($idCampaign);
+    }
+
+    public function createCampaign($senderName, $subject, $body, $idBook, $sendDate, $name = null)
     {
         $senders = $this->getInstanceSendPulseApi()->listSenders();
-        $senderName = null;
         $senderEmail = null;
         foreach ($senders as $sender) {
             $senderEmail = $sender->email;
-            $senderName = $sender->name;
             break;
         }
-        $this->getInstanceSendPulseApi()->createCampaign($senderName, $senderEmail,
-            $subject, $body, $idBook, $sendDate);
+        return $this->getInstanceSendPulseApi()->createCampaign($senderName, $senderEmail,
+            $subject, $body, $idBook, $sendDate, $name);
     }
 
 }

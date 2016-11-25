@@ -9,6 +9,20 @@ class UserGroup extends Base
 {
     protected $tableName = "usergroup";
 
+    protected function getSettingsFetch()
+    {
+        return [
+            "select" => 'u.id, u.name, ue.id_sendpulse',
+            "joins" => [
+                [
+                    "type" => "left",
+                    "table" => 'usergroup_exchange ue',
+                    "condition" => 'ue.id_group = u.id'
+                ]
+            ]
+        ];
+    }
+
     protected function saveAddInfo()
     {
         return $this->saveServiceInfo();

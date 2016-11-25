@@ -20,8 +20,18 @@ class Mailing extends Base
 
     protected function correctValuesBeforeSave()
     {
+        if (isset($this->input["senderDate"]) && empty($this->input["senderDate"]))
+            $this->input["senderDate"] = date("Y-m-d H:i:s");
         if (!empty($this->input["senderDate"]))
             $this->input["senderDate"] = date("Y-m-d H:i:s", strtotime($this->input["senderDate"]));
+        if (empty($this->input["name"]))
+            $this->input["name"] = $this->input["subject"];
+        if (empty($this->input["senderName"])) {
+            $setting = new Setting(["field" => "code", "value" => "shop_name"]);
+            $setting = $setting->fetch();
+            if ($setting)
+                $this->input["senderName"] = $setting[0]["value"];
+        }
     }
 
     protected function getAddInfo()
@@ -31,7 +41,7 @@ class Mailing extends Base
 
     protected function saveAddInfo()
     {
-        return $this->saveUserGroups();
+        return $this->saveUserGroups() && $this->setMailingService();
     }
 
     private function getUserGroups()
@@ -74,6 +84,11 @@ class Mailing extends Base
             $this->error = "Не удаётся сохранить группы пользоваталей для рассылки!";
             throw new Exception($this->error);
         }
+    }
+
+    private function setMailingService()
+    {
+        return (new Service())->saveMailingSettings($this->input);
     }
 
 }

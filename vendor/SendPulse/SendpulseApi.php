@@ -491,6 +491,7 @@ class SendpulseApi {
             return $this->handleError( 'Not all data.' );
         }
 
+        writeLog("ok");
         if( !empty( $attachments ) ) {
             $attachments = serialize( $attachments );
         }
@@ -501,11 +502,14 @@ class SendpulseApi {
             'body'         => base64_encode( $body ),
             'list_id'      => $bookId,
             'name'         => $name,
-            'send_date'    => date("Y-m-d H:i:s", $sendDate),
+            'send_date'    => date("Y-m-d H:i:s", strtotime($sendDate)),
             'attachments'  => $attachments
         );
 
+        writeLog($data);
+
         $requestResult = $this->sendRequest( 'campaigns', 'POST', $data );
+        writeLog($requestResult);
 
         return $this->handleResult( $requestResult );
     }

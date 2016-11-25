@@ -48,6 +48,36 @@ class Service extends Base
 
     }
 
+    public function saveMailingSettings($mail = [])
+    {
+        try {
+            $sendPulse = new SendPulse();
+            $t = new DB('mailing_exchange');
+            $t->select("id_sendpulse");
+            $t->where("id_mailing = ?", $mail["id"]);
+            $result = $t->getList();
+            foreach ($result as $item)
+                $sendPulse->deleteCampaign($item["id_sendpulse"]);
+            if ($result)
+                $t->deleteList();
+            $data = [];
+            foreach ($mail["userGroups"] as $group) {
+                if ($group["isChecked"] && !empty($group["idSendpulse"])) {
+                    $campaign = $sendPulse->createCampaign($mail["senderName"], $mail["subject"], $mail["body"], $group["idSendpulse"],
+                        $mail["senderDate"], $mail["name"]);
+                    if ($campaign && !empty($campaign->id))
+                        $data[] = ["id_mailing" => $mail["id"], "id_sendpulse" => $campaign->id];
+                }
+            }
+            if ($data)
+                DB::insertList("mailing_exchange", $data);
+            return true;
+        } catch (Exception $e) {
+            $this->error = "Не удается сохранить настройки сервиса для рассылки!";
+            throw new Exception($this->error);
+        }
+    }
+
     protected function getAddInfo()
     {
         return ["parameters" => $this->getParameters()];
