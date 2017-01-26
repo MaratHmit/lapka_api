@@ -19,6 +19,7 @@ class ImageFolder extends Base
         $path = DOCUMENT_ROOT . "/" . $this->imagesFolder . $this->input["path"];
         $iterator = new \RecursiveDirectoryIterator($path);
         $fileList = [];
+        $fileListKey = [];
         foreach ($iterator as $entry) {
             if ($entry->getFilename() == '.' || $entry->getFilename() == '..')
                 continue;
@@ -28,8 +29,11 @@ class ImageFolder extends Base
                 $fileInfo["url"] = $protocol . "://" . HOSTNAME . "/" . $this->imagesFolder . $this->input["path"] . $fileInfo["name"];
                 $fileInfo["urlPreview"] = $protocol . "://" . HOSTNAME . "/" . $this->imagesFolder . $this->input["path"] . $fileInfo["name"];
             }
-            $fileList[] = $fileInfo;
+            $fileListKey[$fileInfo["name"]] = $fileInfo;
         }
+        ksort($fileListKey);
+        foreach ($fileListKey as $file)
+            $fileList[] = $file;
         $this->result["items"] = $fileList;
     }
 

@@ -155,6 +155,7 @@ class Import extends Base
         $fileCSV = "{$this->dirFiles}/" . md5($filePath);
         $writer = \PHPExcel_IOFactory::createWriter($excel, 'CSV');
         $writer->save($fileCSV);
+        $this->convertFromCustomerFormat($fileCSV);
         return $fileCSV;
     }
 
@@ -256,5 +257,41 @@ class Import extends Base
         }
 
         return $result;
+    }
+
+    private function convertFromCustomerFormat($file)
+    {
+        $rows = [];
+        $isConvert = false;
+        if (($handle = fopen($file, "r")) !== false) {
+            while (($row = fgetcsv($handle, 16000, ",")) !== false) {
+                $isConvert = $isConvert || ($row[0] == "Ид.") && ($row[1] == "Путь") && empty($row[5]);
+                if (!$isConvert)
+                    return;
+                $rows[] = $row;
+            }
+        }
+        fclose($handle);
+
+        $items[] = ["Ид.Группы", "Артикул", "Наименование", "Бренд", "Остаток", "Цена", "Изображение", "Краткое описание"];
+        $idGroup = null;
+        for ($i = 1; $i < count($rows); ++$i) {
+            $row = $rows[$i];
+            if (!empty($row[0])) {
+                $idGroup = $row[0];
+                continue;
+            }
+            if (!empty($row[5])) {
+                $dir = substr($row["5"], 0, 2);
+                $imagePath = 'products/' . $dir . "/" . $row[5] . ".jpg";
+                $items[] = [$idGroup, $row[5], $row[1], $row[4], $row[2], $row[3], $imagePath, $row[6]];
+            }
+        }
+
+        if (($handle = fopen($file, "w")) !== false) {
+            foreach ($items as $item)
+                fputcsv($handle, $item);
+        }
+        fclose($handle);
     }
 }

@@ -524,6 +524,8 @@ class Base
     protected function getPatternsBySelect($selectQuery)
     {
         $result = [];
+        $selectQuery = str_replace("`", "", $selectQuery);
+        $selectQuery = preg_replace('/\w+\(.*\)\s\w+/', '', $selectQuery);
         preg_match_all('/\w+[.]+\w+\s\w+/', $selectQuery, $matches);
         if (count($matches) && count($matches[0])) {
             foreach ($matches[0] as $match) {
