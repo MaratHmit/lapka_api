@@ -79,10 +79,12 @@ class Base
             return $this->input[$name];
     }
 
-    public function initConnection($connection)
+    public function initConnection()
     {
         try {
-            DB::initConnection($connection);
+            $CONFIG = [];
+            include DOCUMENT_ROOT . '/system/db_config.php';
+            DB::initConnection($CONFIG);
             $this->init();
             return true;
         } catch (Exception $e) {
@@ -91,13 +93,19 @@ class Base
         }
     }
 
+    public function getResult()
+    {
+        return $this->result;
+    }
+
     public function output()
     {
         if (!empty($this->error) && $this->statusAnswer == 200)
             $this->statusAnswer = 500;
         switch ($this->statusAnswer) {
             case 200: {
-                echo json_encode($this->result);
+                $result = json_encode($this->result);
+                echo $result;
                 exit;
             }
             case 404: {

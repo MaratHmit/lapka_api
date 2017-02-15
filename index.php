@@ -14,6 +14,8 @@ date_default_timezone_set("Europe/Moscow");
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
+header('Content-type: text/html; charset="utf-8"');
+
 define('API_ROOT', $_SERVER['DOCUMENT_ROOT'] . '/api/');
 define('API_ROOT_URL', "http://" . $_SERVER['SERVER_NAME'] . "/api");
 
@@ -28,21 +30,20 @@ function writeLog($data)
 }
 
 require_once 'lib/lib_function.php';
-require_once 'lib/PHPExcel.php';
-require_once 'lib/PHPExcel/Writer/Excel2007.php';
 require_once API_ROOT . "vendor/autoload.php";
 
 $apiMethod = $_SERVER['REQUEST_METHOD'];
 $apiClass = parse_url($_SERVER["REQUEST_URI"]);
 $apiClass = str_replace("api/", "", trim($apiClass['path'], "/"));
 $origin = !empty($headers['Origin']) ? $headers['Origin'] : $headers['origin'];
+
 if (!empty($origin)) {
     $url = parse_url($origin);
     if ($url) {
-        if ($url['host'] == 'lapka.e-stile.ru')
-            header("Access-Control-Allow-Origin: http://lapka.e-stile.ru");
-        if ($url['host'] == 'localhost' && $url['port'] == 1338)
-            header("Access-Control-Allow-Origin: http://localhost:1338");
+        if ($url['host'] == 'lapka.me')
+            header("Access-Control-Allow-Origin: http://lapka.me");
+        if ($url['host'] == 'localhost' && $url['port'] == 1400)
+            header("Access-Control-Allow-Origin: http://localhost:1400");
         header("Access-Control-Allow-Credentials: true");
         header("Access-Control-Allow-Headers: Project, Secookie");
         header("Access-Control-Allow-Methods: $allowedMethods");
@@ -70,15 +71,9 @@ $phpInput = file_get_contents('php://input');
 
 define("HOSTNAME", $_SERVER["HTTP_HOST"]);
 define('DOCUMENT_ROOT', $_SERVER["DOCUMENT_ROOT"]);
-$dbConfig = DOCUMENT_ROOT . '/system/db_config.php';
-
-if (file_exists($dbConfig))
-    require_once $dbConfig;
-else {
-    header("HTTP/1.1 401 Unauthorized");
-    echo 'Сессия истекла! Необходима авторизация!';
-    exit;
-}
+define('URL_ROOT', $_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST']);
+define('URL_FILES', URL_ROOT . "/files");
+define('DIR_FILES', DOCUMENT_ROOT . "/files");
 
 if ($apiClass != "Auth" && empty($_SESSION['isAuth'])) {
     header("HTTP/1.1 401 Unauthorized");
@@ -99,6 +94,6 @@ if (!method_exists($apiClass, $apiMethod)) {
 }
 
 $apiObject = new $apiClass($phpInput);
-if ($apiObject->initConnection($CONFIG))
+if ($apiObject->initConnection())
     $apiObject->$apiMethod();
 $apiObject->output();

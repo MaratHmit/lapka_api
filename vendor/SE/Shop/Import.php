@@ -82,6 +82,10 @@ class Import extends Base
                     if (!empty($this->input["idBrand"]))
                         $product["idBrand"] = $this->input["idBrand"];
                     if (!empty($product["image"])) {
+                        if ($product["image"] == $product["article"]) {
+                            $dir = substr($product["image"], 0, 2);
+                            $product["image"] = 'products/' . $dir . "/" . $product["image"] . ".jpg";
+                        }
                         if (!empty($product["name"])) {
                             $image["alt"] = $product["name"];
                             $image["title"] = $product["name"];
@@ -155,7 +159,7 @@ class Import extends Base
         $fileCSV = "{$this->dirFiles}/" . md5($filePath);
         $writer = \PHPExcel_IOFactory::createWriter($excel, 'CSV');
         $writer->save($fileCSV);
-        $this->convertFromCustomerFormat($fileCSV);
+        //$this->convertFromCustomerFormat($fileCSV);
         return $fileCSV;
     }
 
@@ -273,7 +277,7 @@ class Import extends Base
         }
         fclose($handle);
 
-        $items[] = ["Ид.Группы", "Артикул", "Наименование", "Бренд", "Остаток", "Цена", "Изображение", "Краткое описание"];
+        $items[] = ["Ид.Группы", "Артикул", "Наименование", "Остаток", "Цена", "Бренд", "Изображение", "Краткое описание"];
         $idGroup = null;
         for ($i = 1; $i < count($rows); ++$i) {
             $row = $rows[$i];

@@ -8,6 +8,22 @@ use SE\Exception;
 class Auth extends Base
 {
 
+    static public function getIdCurrency()
+    {
+        $u = new DB('shop_currency', 'sc');
+        $u->select("id");
+        $u->where("is_main");
+        return $u->fetchOne()["id"];
+    }
+
+    static public function getIdTypePrice()
+    {
+        $t = new DB("shop_typeprice");
+        $t->select("id");
+        $t->where("code = 'retail'");
+        return $t->fetchOne()["id"];
+    }
+
     public function getPermission($idUser)
     {
         if (!$idUser)
@@ -27,21 +43,6 @@ class Auth extends Base
         }
     }
 
-    private function getIdCurrency()
-    {
-        $u = new DB('shop_currency', 'sc');
-        $u->select("id");
-        $u->where("is_main");
-        return $u->fetchOne()["id"];
-    }
-
-    private function getIdTypePrice()
-    {
-        $t = new DB("shop_typeprice");
-        $t->select("id");
-        $t->where("code = 'retail'");
-        return $t->fetchOne()["id"];
-    }
 
     public function info($id = null)
     {
