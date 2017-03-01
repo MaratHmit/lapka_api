@@ -58,9 +58,10 @@ class MacrosHandler extends Base
         $order = $u->fetchOne();
 
         $u = new DB('shop_order_item', 'soi');
-        $u->select('soi.*, so.article, spt.name,
+        $u->select('soi.*, so.article, spt.name, sp.url,
             GROUP_CONCAT(CONCAT_WS(": ", sft.name, sfv.value) SEPARATOR ", ") name_params');
         $u->leftJoin('shop_offer so', 'so.id = soi.id_offer');
+        $u->leftJoin('shop_product sp', 'so.id_product = sp.id');
         $u->leftJoin('shop_product_translate spt', 'spt.id_product = so.id_product');
         $u->leftJoin('shop_offer_feature sof', 'sof.id_offer = so.id');
         $u->leftJoin('shop_feature_translate sft', 'sft.id_feature = sof.id_feature');
@@ -73,9 +74,14 @@ class MacrosHandler extends Base
         foreach ($items as $item) {
             if ($item["nameParams"])
                 $item["name"] .= " - {$item["nameParams"]}";
+            $item["amount"] = ($item['price'] - $item['discount']) * $item['count'];
+            $item["url_product"] = URL_ROOT . "/catalogue/product/" . $item["url"] . "/";
+
             $orderItems[] = $item;
+            $order['amount'] += $item["amount"];
         }
         $order["items"] = $orderItems;
+        $order['amount'] = $order['amount'] - $order['discount'];
 
         return $order;
     }
@@ -238,24 +244,14 @@ class MacrosHandler extends Base
 
     private function parseOrder($text)
     {
-        if (strpos($text, '[ORDER.ITEMS]') !== false){
-            $value_list = '<table border=0 cellpadding=3 cellspacing=1>';
-            $value_list .= '<tr><td>№</td><td>Фото</td><td>Артикул</td><td>Наименование</td><td>Цена</td><td>Скидка</td><td>Кол-во</td><td>Сумма</td>';
-            $value_list .= '</tr><ORDER_LIST><tr>';
-            $value_list .= '<td>[ORDER.ITEM.NUM]</td>';
-            $value_list .= '<td>[ORDER.ITEM.PHOTO]</td>';
-            $value_list .= '<td>[ORDER.ITEM.ARTICLE]</td>';
-            $value_list .= '<td>[ORDER.ITEM.NAME]</td>';
-            $value_list .= '<td>[ORDER.ITEM.PRICE]</td><td>[ORDER.ITEM.DISCOUNT]</td>';
-            $value_list .= '<td>[ORDER.ITEM.COUNT]</td><td>[ORDER.ITEM.SUM]</td>';
-            $value_list .= '</tr></ORDER_LIST></table>';
-            $text = str_replace('[ORDER.ITEMS]', $value_list, $text);
-        }
+        $text = str_replace('<!--<ORDER_LIST>-->', '<ORDER_LIST>', $text);
+        $text = str_replace('<!--</ORDER_LIST>-->', '</ORDER_LIST>', $text);
 
         if (preg_match('/\<ORDER_LIST\>([\w\W]{1,})\<\/ORDER_LIST\>/i', $text, $resMath)) {
             $it = 0;
             $listText = null;
             foreach ($this->order["items"] as $orderItem) {
+                writeLog($orderItem);
                 $listIt = $resMath[1];
                 $listIt = str_replace("[ORDER.ITEM.NUM]", ++$it, $listIt);
                 $res = $orderItem;
@@ -265,6 +261,10 @@ class MacrosHandler extends Base
             }
             $text = str_replace($resMath[0], $listText, $text);
         }
+
+        foreach ($this->order as $k => $v)
+            $text = str_replace('[ORDER.' . strtoupper($k) . ']', stripslashes($v), $text);
+        $text = preg_replace('/\[ORDER\.(.+?)\]/i', '', $text);
 
         return $text;
     }

@@ -84,6 +84,14 @@ class Order extends Base
         ];
     }
 
+    protected function correctValuesBeforeFetch($items = [])
+    {
+        foreach ($items as &$item)
+            $item['customerPhone'] = User::correctPhone($item['customerPhone']);
+
+        return $items;
+    }
+
     protected function getSettingsInfo()
     {
         return [

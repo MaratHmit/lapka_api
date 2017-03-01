@@ -42,8 +42,8 @@ if (!empty($origin)) {
     if ($url) {
         if ($url['host'] == 'lapka.me')
             header("Access-Control-Allow-Origin: http://lapka.me");
-        if ($url['host'] == 'localhost' && $url['port'] == 1400)
-            header("Access-Control-Allow-Origin: http://localhost:1400");
+        if ($url['host'] == 'localhost' && $url['port'] == 1500)
+            header("Access-Control-Allow-Origin: http://localhost:1500");
         header("Access-Control-Allow-Credentials: true");
         header("Access-Control-Allow-Headers: Project, Secookie");
         header("Access-Control-Allow-Methods: $allowedMethods");
@@ -69,10 +69,14 @@ if ($apiClass == "Auth" && strtolower($apiMethod) == "get") {
 
 $phpInput = file_get_contents('php://input');
 
+if (empty($_SERVER['REQUEST_SCHEME']))
+    $_SERVER['REQUEST_SCHEME'] = !empty($_SERVER['HTTPS']) ? 'https' : 'http';
+
 define("HOSTNAME", $_SERVER["HTTP_HOST"]);
 define('DOCUMENT_ROOT', $_SERVER["DOCUMENT_ROOT"]);
 define('URL_ROOT', $_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST']);
 define('URL_FILES', URL_ROOT . "/files");
+define('URL_IMAGES', URL_ROOT . "/images");
 define('DIR_FILES', DOCUMENT_ROOT . "/files");
 
 if ($apiClass != "Auth" && empty($_SESSION['isAuth'])) {

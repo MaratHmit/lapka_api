@@ -9,6 +9,22 @@ class User extends Base
 {
     protected $tableName = "user";
 
+    static public function correctPhone($phone)
+    {
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        $result = null;
+        for ($i = 0; $i < strlen($phone); $i++) {
+            $result .= $phone[$i];
+            if ($i == 0)
+                $result .= ' (';
+            if ($i == 3)
+                $result .= ') ';
+            if ($i == 6 || $i == 8)
+                $result .= '-';
+        }
+        return '+' . $result;
+    }
+
     protected function getSettingsFetch()
     {
         return array(

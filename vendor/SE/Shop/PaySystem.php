@@ -12,10 +12,6 @@ class PaySystem extends Base
 
     protected function saveAddInfo()
     {
-        if (!empty($this->input["code"])) {
-            $scriptPlugin = 'http://' . HOSTNAME . "/lib/merchant/result.php?payment=" . $this->input["code"];
-            file_get_contents($scriptPlugin);
-        }
         return $this->saveParams();
     }
 
@@ -30,7 +26,6 @@ class PaySystem extends Base
     protected function getAddInfo()
     {
         $result["params"] = $this->getParams();
-        $result["plugins"] = PaySystemPlugin::getPlugins();
         return $result;
     }
 
